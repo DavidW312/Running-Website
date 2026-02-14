@@ -17,6 +17,7 @@ main {
     display: flex;
     gap: 20px;
     flex-wrap: wrap;
+    align-items: flex-start;
 }
 
 section {
@@ -110,4 +111,13 @@ thead tr:hover {
 
 #week-selector:focus {
     border-width: 2px;
+}
+
+#pr-search {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid chocolate;
+    border-radius: 4px;
+    box-sizing: border-box; /* Keeps padding from breaking the width */
 }

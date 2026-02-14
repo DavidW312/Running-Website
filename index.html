@@ -16,9 +16,7 @@
         <div class="controls">
             <label for="week-selector">View Week:</label>
             <select id="week-selector">
-                <option value="Week1">Week 1 (Feb 2-7)</option>
-                <option value="Week2">Week 2 (Feb 9-14)</option>
-                <option value="Week3">Week 3 (Feb 16-25)</option>
+                <option value="Week1">Week 1 (Feb 16-21)</option>
             </select>
         </div>
         <section id="mileage-section">
@@ -30,8 +28,12 @@
 
         <section id="pr-section">
             <h2>Personal Records</h2>
+            <div class="controls">
+                <input type="text" id="pr-search" placeholder="Search athlete name..." onkeyup="filterPRs()">
+            </div>
+
             <div id="pr-container">
-                <p>Loading PRs (from Athletic.net)</p>
+                <p>Loading PRs...</p>
             </div>
         </section>
     </main>
