@@ -33,3 +33,24 @@ h2{
     border-bottom: 2px solid #eee;
     padding-bottom: 10px;
 }
+
+.athlete-item {
+    display: flex; /* Turn this list item into a flex container */
+    justify-content: space-between; /* Push name to left, miles to right */
+    padding: 10px 0;
+    border-bottom: 1px solid #eee; /* Add a subtle line between athletes */
+}
+
+.name {
+    font-weight: bold;
+}
+
+.miles {
+    color: #555;
+    font-style: italic;
+}
+
+ul {
+    list-style-type: none; /* Removes the default bullet points */
+    padding: 0;
+}
