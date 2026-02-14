@@ -3,10 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Athlete Tracker</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Hello here is my website</h1>
-    <p>Here is some content</p>
+    <header>
+        <h1>Team Performance Dashboard</h1>
+        <p>Tracking mileage and personal records</p>
+    </header>
+
+    <main>
+        <section id="mileage-section">
+            <h2>Weekly Mileage</h2>
+            <div id="mileage-container">
+                <p>Loading mileage data...</p>
+            </div>
+        </section>
+
+        <section id="pr-section">
+            <h2>Personal Records</h2>
+            <div id="pr-container">
+                <p>Loading PRs (from Athletic.net)</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
 </body>
 </html>
