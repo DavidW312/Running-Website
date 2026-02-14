@@ -1,56 +1,113 @@
 /* General page styles */
-body{
+body {
     font-family: Arial, Helvetica, sans-serif;
-    background-color:azure;
+    background-color: azure;
     margin: 0;
     padding: 20px;
-    color:burlywood
+    color: #8b4513; 
 }
 
-header{
+header {
     text-align: center;
     margin-bottom: 30px;
 }
 
-/* Layout for the two sections */
-main{
+/* Layout for the two sections (Mileage and PRs) */
+main {
     display: flex;
     gap: 20px;
     flex-wrap: wrap;
 }
 
-section{
-    background:white;
+section {
+    background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
     flex: 1;
-    min-width: 300px;
+    min-width: 400px;
 }
 
-h2{
-    color:chocolate;
-    border-bottom: 2px solid #eee;
+h2 {
+    color: chocolate;
+    border-bottom: 2px solid #fdf5e6;
     padding-bottom: 10px;
+    margin-top: 0;
 }
 
-.athlete-item {
-    display: flex; /* Turn this list item into a flex container */
-    justify-content: space-between; /* Push name to left, miles to right */
-    padding: 10px 0;
-    border-bottom: 1px solid #eee; /* Add a subtle line between athletes */
+/* Table General Styling */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    font-size: 0.9rem;
+    margin-top: 10px;
 }
 
-.name {
+/* Headers - Fixed the hover issue here */
+thead {
+    background-color: chocolate;
+    color: white;
+}
+
+th {
+    padding: 12px 8px;
+    border: 1px solid #f0f0f0;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+td {
+    padding: 12px 8px;
+    border: 1px solid #f0f0f0;
+    text-align: center;
+}
+
+/* The name column */
+.name-cell {
+    text-align: left;
     font-weight: bold;
+    color: #333;
+    background-color: #fffaf0;
 }
 
-.miles {
-    color: #555;
-    font-style: italic;
+/* The Total column styling */
+.total-cell {
+    background-color: #fff5ee;
+    font-weight: bold;
+    color: chocolate;
+    border-left: 2px solid #eee;
 }
 
-ul {
-    list-style-type: none; /* Removes the default bullet points */
-    padding: 0;
+/* HOVER FIX: Only highlight rows in the body, not the header */
+tbody tr:hover {
+    background-color: #f0ffff; /* Light cyan highlight */
+}
+
+/* Ensure header row does not change color on hover */
+thead tr:hover {
+    background-color: chocolate;
+}
+
+/* Dropdown Switcher Styling */
+.controls {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#week-selector {
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid chocolate;
+    background-color: white;
+    color: #8b4513;
+    cursor: pointer;
+    outline: none;
+}
+
+#week-selector:focus {
+    border-width: 2px;
 }
