@@ -1,7 +1,9 @@
 const SHEET_ID = '1z-tYsvka0xCvYAp6iki0o5IIaUXi-ZOosnvUDxmylIA';
 const API_KEY = 'AIzaSyAijjbGyF0cY0BLgEa_LmkYjyL1UDnQVQ8';
 
-// This stores our PR data so we can search through it later
+// Global variables to store data for filtering and sorting
+let currentWeekData = [];
+let originalWeekData = []; // Snapshot of the original A-Z order
 let allPRs = []; 
 
 // 1. Setup on Page Load
@@ -13,6 +15,8 @@ window.onload = function() {
 // 2. Build the Week Selector Dropdown
 async function initDropdown() {
     const selector = document.getElementById('week-selector');
+    if (!selector) return;
+
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}`;
 
     try {
@@ -37,8 +41,6 @@ async function initDropdown() {
 
         if (selector.options.length > 0) {
             fetchWeeklyData(selector.options[0].value);
-        } else {
-            document.getElementById('mileage-container').innerHTML = "No tabs named 'Week' found.";
         }
 
     } catch (error) {
@@ -51,42 +53,21 @@ async function fetchWeeklyData(tabName) {
     const container = document.getElementById('mileage-container');
     container.innerHTML = `<p>Loading ${tabName}...</p>`;
 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${tabName}!A1:H?key=${API_KEY}`;
+    // This tells the browser to convert spaces/slashes into safe "web-code"
+    const encodedTabName = encodeURIComponent(`'${tabName}'`);
 
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodedTabName}!A1:H?key=${API_KEY}`;
+    
     try {
         const response = await fetch(url);
         const data = await response.json();
 
         if (data.values && data.values.length > 0) {
-            let htmlContent = `
-                <table class="mileage-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-
-            for (let i = 1; i < data.values.length; i++) {
-                const row = data.values[i];
-                if (row[0]) {
-                    htmlContent += `
-                        <tr>
-                            <td class="name-cell">${row[0]}</td>
-                            <td>${row[1] || 0}</td>
-                            <td>${row[2] || 0}</td>
-                            <td>${row[3] || 0}</td>
-                            <td>${row[4] || 0}</td>
-                            <td>${row[5] || 0}</td>
-                            <td>${row[6] || 0}</td>
-                            <td class="total-cell">${row[7] || 0}</td>
-                        </tr>`;
-                }
-            }
-            htmlContent += "</tbody></table>";
-            container.innerHTML = htmlContent;
+            // Save alphabetical data (skipping headers)
+            originalWeekData = data.values.slice(1); 
+            // Create a copy for sorting so the original stays safe
+            currentWeekData = [...originalWeekData]; 
+            renderMileageTable(currentWeekData);
         } else {
             container.innerHTML = `<p>No data found for ${tabName}.</p>`;
         }
@@ -95,9 +76,65 @@ async function fetchWeeklyData(tabName) {
     }
 }
 
-// 4. Fetch PR Data
+// 4. Render Mileage Table
+function renderMileageTable(rows) {
+    const container = document.getElementById('mileage-container');
+    let htmlContent = `
+        <table class="mileage-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    rows.forEach(row => {
+        if (row[0]) {
+            htmlContent += `
+                <tr>
+                    <td class="name-cell">${row[0]}</td>
+                    <td>${row[1] || 0}</td>
+                    <td>${row[2] || 0}</td>
+                    <td>${row[3] || 0}</td>
+                    <td>${row[4] || 0}</td>
+                    <td>${row[5] || 0}</td>
+                    <td>${row[6] || 0}</td>
+                    <td class="total-cell">${row[7] || 0}</td>
+                </tr>`;
+        }
+    });
+
+    htmlContent += "</tbody></table>";
+    container.innerHTML = htmlContent;
+}
+
+// 5. SORT MILEAGE FUNCTION
+window.sortMileage = function() {
+    if (currentWeekData.length === 0) return;
+
+    // Sort the copy by Column H (Index 7) from highest to lowest
+    currentWeekData.sort((a, b) => {
+        const valA = parseFloat(a[7]) || 0;
+        const valB = parseFloat(b[7]) || 0;
+        return valB - valA;
+    });
+
+    renderMileageTable(currentWeekData);
+};
+
+// 6. RESET SORT FUNCTION
+window.resetSort = function() {
+    if (originalWeekData.length === 0) return;
+    
+    // Replace current data with the original alphabetical snapshot
+    currentWeekData = [...originalWeekData];
+    renderMileageTable(currentWeekData);
+};
+
+// 7. Fetch PR Data
 async function fetchPRs() {
-    // Range A1:D (Name, 800, 1600, 3200)
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/PRs!A1:D?key=${API_KEY}`;
 
     try {
@@ -110,11 +147,10 @@ async function fetchPRs() {
         }
     } catch (error) {
         console.error("PR Error:", error);
-        document.getElementById('pr-container').innerHTML = "Make sure your tab is named 'PRs'";
     }
 }
 
-// 5. Draw the PR Table
+// 8. Render PR Table
 function renderPRTable(rows) {
     const container = document.getElementById('pr-container');
     if (!container) return;
@@ -127,8 +163,10 @@ function renderPRTable(rows) {
                 </thead>
                 <tbody>`;
 
-    for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
+    // Detect if first row is headers and skip if necessary
+    const dataRows = (rows[0] && rows[0][0] === "Name") ? rows.slice(1) : rows;
+
+    dataRows.forEach(row => {
         if (row[0]) {
             html += `<tr>
                         <td class="name-cell">${row[0]}</td>
@@ -137,31 +175,26 @@ function renderPRTable(rows) {
                         <td>${row[3] || '--'}</td>
                      </tr>`;
         }
-    }
+    });
     html += "</tbody></table>";
     container.innerHTML = html;
 }
 
-// 6. Search/Filter PRs
-function filterPRs() {
+// 9. SEARCH/FILTER PRs
+window.filterPRs = function() {
     const searchInput = document.getElementById('pr-search');
+    if (!searchInput) return;
+    
     const searchTerm = searchInput.value.toLowerCase();
     
-    console.log("Searching for:", searchTerm); // This helps us debug!
-
-    // If for some reason allPRs is empty, stop here
     if (allPRs.length === 0) return;
 
-    // 1. Keep the header row (Name, 800m, etc.)
-    const header = allPRs[0];
+    const dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
 
-    // 2. Filter the data rows (everything after the header)
-    const filteredData = allPRs.slice(1).filter(row => {
+    const filteredData = dataOnly.filter(row => {
         const name = row[0] ? row[0].toLowerCase() : "";
         return name.includes(searchTerm);
     });
 
-    // 3. Combine them back together and redraw the table
-    const rowsToDisplay = [header, ...filteredData];
-    renderPRTable(rowsToDisplay);
-}
+    renderPRTable(filteredData);
+};

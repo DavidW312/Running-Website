@@ -13,14 +13,17 @@
     </header>
 
     <main>
-        <div class="controls">
-            <label for="week-selector">View Week:</label>
-            <select id="week-selector">
-                <option value="Week1">Week 1 (Feb 16-21)</option>
-            </select>
-        </div>
         <section id="mileage-section">
             <h2>Weekly Mileage</h2>
+
+            <div class="controls">
+                <label for="week-selector">View Week:</label>
+                <select id="week-selector"></select>
+    
+                <button onclick="sortMileage()" class="sort-btn">Sort by Highest Mileage</button>
+                <button onclick="resetSort()" class="reset-btn">Reset Order</button>
+            </div>
+
             <div id="mileage-container">
                 <p>Loading mileage data...</p>
             </div>
