@@ -185,3 +185,35 @@ thead tr:hover {
     color: white;
     border-color: chocolate;
 }
+/* 1. Center the headers and descriptions */
+header, h2, .controls {
+    text-align: center;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 15px;
+}
+
+/* 2. Fix the "Bigger than the screen" issue */
+#mileage-container, #pr-container {
+    width: 100%;
+    overflow-x: auto; /* Adds a scrollbar on mobile */
+    margin-top: 15px;
+    /* This prevents the table from breaking the layout */
+    display: block; 
+}
+
+/* 3. Ensure the table stays readable */
+.mileage-table, #pr-container table {
+    width: 100%;
+    min-width: 600px; /* Prevents squishing; allows athletes to swipe left/right */
+    border-collapse: collapse;
+}
+
+/* 4. Make the buttons look better on small screens */
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
