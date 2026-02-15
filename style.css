@@ -73,6 +73,7 @@ td {
     background-color: #fffaf0;
 }
 
+
 /* The Total column styling */
 .total-cell {
     background-color: #fff5ee;
@@ -80,6 +81,7 @@ td {
     color: chocolate;
     border-left: 2px solid #eee;
 }
+
 
 /* HOVER FIX: Only highlight rows in the body, not the header */
 tbody tr:hover {
@@ -146,3 +148,22 @@ thead tr:hover {
 
 .sort-btn:hover { background-color: #8b4513; }
 .reset-btn:hover { background-color: #333; }
+
+/* Styling for Attendance Statuses */
+.status-absent {
+    color: #e74c3c; /* Bright Red */
+    font-weight: bold;
+    background-color: #fdeaea; /* Very light red background */
+}
+
+.status-excused {
+    color: #f39c12; /* Warning Orange */
+    font-weight: bold;
+    background-color: #fff5e6;
+}
+
+.status-injured {
+    color: #3498db; /* Injury Blue */
+    font-weight: bold;
+    background-color: #ebf5fb;
+}

@@ -1,18 +1,17 @@
 const SHEET_ID = '1z-tYsvka0xCvYAp6iki0o5IIaUXi-ZOosnvUDxmylIA';
 const API_KEY = 'AIzaSyAijjbGyF0cY0BLgEa_LmkYjyL1UDnQVQ8';
 
-// Global variables to store data for filtering and sorting
+// Global variables
 let currentWeekData = [];
-let originalWeekData = []; // Snapshot of the original A-Z order
+let originalWeekData = []; 
 let allPRs = []; 
 
-// 1. Setup on Page Load
 window.onload = function() {
-    initDropdown(); // Handles Mileage weeks
-    fetchPRs();     // Handles the PR table
+    initDropdown();
+    fetchPRs();
 };
 
-// 2. Build the Week Selector Dropdown
+// 1. Dropdown Setup
 async function initDropdown() {
     const selector = document.getElementById('week-selector');
     if (!selector) return;
@@ -24,7 +23,6 @@ async function initDropdown() {
         const spreadsheet = await response.json();
         
         selector.innerHTML = "";
-
         spreadsheet.sheets.forEach(sheet => {
             const title = sheet.properties.title;
             if (title.includes("Week")) {
@@ -42,20 +40,17 @@ async function initDropdown() {
         if (selector.options.length > 0) {
             fetchWeeklyData(selector.options[0].value);
         }
-
     } catch (error) {
         console.error("Error building dropdown:", error);
     }
 }
 
-// 3. Fetch Mileage Data
+// 2. Fetch Weekly Data
 async function fetchWeeklyData(tabName) {
     const container = document.getElementById('mileage-container');
     container.innerHTML = `<p>Loading ${tabName}...</p>`;
 
-    // This tells the browser to convert spaces/slashes into safe "web-code"
     const encodedTabName = encodeURIComponent(`'${tabName}'`);
-
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodedTabName}!A1:H?key=${API_KEY}`;
     
     try {
@@ -63,9 +58,7 @@ async function fetchWeeklyData(tabName) {
         const data = await response.json();
 
         if (data.values && data.values.length > 0) {
-            // Save alphabetical data (skipping headers)
             originalWeekData = data.values.slice(1); 
-            // Create a copy for sorting so the original stays safe
             currentWeekData = [...originalWeekData]; 
             renderMileageTable(currentWeekData);
         } else {
@@ -76,7 +69,20 @@ async function fetchWeeklyData(tabName) {
     }
 }
 
-// 4. Render Mileage Table
+// 3. Helpers for Math and Colors
+function getMileageValue(val) {
+    let num = parseFloat(val);
+    return isNaN(num) ? 0 : num;
+}
+
+function getStatusClass(val) {
+    if (val === "A") return "status-absent";
+    if (val === "XA") return "status-excused";
+    if (val === "INJ") return "status-injured";
+    return "";
+}
+
+// 4. Render Table
 function renderMileageTable(rows) {
     const container = document.getElementById('mileage-container');
     let htmlContent = `
@@ -92,16 +98,21 @@ function renderMileageTable(rows) {
 
     rows.forEach(row => {
         if (row[0]) {
+            let calculatedTotal = 
+                getMileageValue(row[1]) + getMileageValue(row[2]) + 
+                getMileageValue(row[3]) + getMileageValue(row[4]) + 
+                getMileageValue(row[5]) + getMileageValue(row[6]);
+
             htmlContent += `
                 <tr>
                     <td class="name-cell">${row[0]}</td>
-                    <td>${row[1] || 0}</td>
-                    <td>${row[2] || 0}</td>
-                    <td>${row[3] || 0}</td>
-                    <td>${row[4] || 0}</td>
-                    <td>${row[5] || 0}</td>
-                    <td>${row[6] || 0}</td>
-                    <td class="total-cell">${row[7] || 0}</td>
+                    <td class="${getStatusClass(row[1])}">${row[1] || 0}</td>
+                    <td class="${getStatusClass(row[2])}">${row[2] || 0}</td>
+                    <td class="${getStatusClass(row[3])}">${row[3] || 0}</td>
+                    <td class="${getStatusClass(row[4])}">${row[4] || 0}</td>
+                    <td class="${getStatusClass(row[5])}">${row[5] || 0}</td>
+                    <td class="${getStatusClass(row[6])}">${row[6] || 0}</td>
+                    <td class="total-cell">${calculatedTotal.toFixed(1)}</td>
                 </tr>`;
         }
     });
@@ -110,91 +121,52 @@ function renderMileageTable(rows) {
     container.innerHTML = htmlContent;
 }
 
-// 5. SORT MILEAGE FUNCTION
+// 5. SORTING FUNCTIONS (Buttons)
 window.sortMileage = function() {
     if (currentWeekData.length === 0) return;
-
-    // Sort the copy by Column H (Index 7) from highest to lowest
     currentWeekData.sort((a, b) => {
-        const valA = parseFloat(a[7]) || 0;
-        const valB = parseFloat(b[7]) || 0;
-        return valB - valA;
+        const totalA = getMileageValue(a[1]) + getMileageValue(a[2]) + getMileageValue(a[3]) + 
+                       getMileageValue(a[4]) + getMileageValue(a[5]) + getMileageValue(a[6]);
+        const totalB = getMileageValue(b[1]) + getMileageValue(b[2]) + getMileageValue(b[3]) + 
+                       getMileageValue(b[4]) + getMileageValue(b[5]) + getMileageValue(b[6]);
+        return totalB - totalA;
     });
-
     renderMileageTable(currentWeekData);
 };
 
-// 6. RESET SORT FUNCTION
 window.resetSort = function() {
-    if (originalWeekData.length === 0) return;
-    
-    // Replace current data with the original alphabetical snapshot
     currentWeekData = [...originalWeekData];
     renderMileageTable(currentWeekData);
 };
 
-// 7. Fetch PR Data
+// 6. PR FUNCTIONS
 async function fetchPRs() {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/PRs!A1:D?key=${API_KEY}`;
-
     try {
         const response = await fetch(url);
         const data = await response.json();
-
-        if (data.values && data.values.length > 0) {
+        if (data.values) {
             allPRs = data.values; 
             renderPRTable(allPRs);
         }
-    } catch (error) {
-        console.error("PR Error:", error);
-    }
+    } catch (e) { console.error(e); }
 }
 
-// 8. Render PR Table
 function renderPRTable(rows) {
     const container = document.getElementById('pr-container');
-    if (!container) return;
-
-    let html = `<table>
-                <thead>
-                    <tr>
-                        <th>Name</th><th>800m</th><th>1600m</th><th>3200m</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-    // Detect if first row is headers and skip if necessary
     const dataRows = (rows[0] && rows[0][0] === "Name") ? rows.slice(1) : rows;
-
+    let html = `<table><thead><tr><th>Name</th><th>800m</th><th>1600m</th><th>3200m</th></tr></thead><tbody>`;
     dataRows.forEach(row => {
         if (row[0]) {
-            html += `<tr>
-                        <td class="name-cell">${row[0]}</td>
-                        <td>${row[1] || '--'}</td>
-                        <td>${row[2] || '--'}</td>
-                        <td>${row[3] || '--'}</td>
-                     </tr>`;
+            html += `<tr><td class="name-cell">${row[0]}</td><td>${row[1]||'--'}</td><td>${row[2]||'--'}</td><td>${row[3]||'--'}</td></tr>`;
         }
     });
-    html += "</tbody></table>";
-    container.innerHTML = html;
+    container.innerHTML = html + "</tbody></table>";
 }
 
-// 9. SEARCH/FILTER PRs
 window.filterPRs = function() {
-    const searchInput = document.getElementById('pr-search');
-    if (!searchInput) return;
-    
-    const searchTerm = searchInput.value.toLowerCase();
-    
-    if (allPRs.length === 0) return;
-
+    const searchTerm = document.getElementById('pr-search').value.toLowerCase();
     const dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
-
-    const filteredData = dataOnly.filter(row => {
-        const name = row[0] ? row[0].toLowerCase() : "";
-        return name.includes(searchTerm);
-    });
-
-    renderPRTable(filteredData);
+    const filtered = dataOnly.filter(row => row[0] && row[0].toLowerCase().includes(searchTerm));
+    renderPRTable(filtered);
 };
