@@ -3,8 +3,9 @@ const API_KEY = 'AIzaSyAijjbGyF0cY0BLgEa_LmkYjyL1UDnQVQ8';
 
 // Global variables
 let currentWeekData = [];
-let originalWeekData = []; 
-let allPRs = []; 
+let originalWeekData = [];
+let allPRs = [];
+let prSortState = { column: null, ascending: true };
 
 window.onload = function() {
     initDropdown();
@@ -155,18 +156,82 @@ async function fetchPRs() {
 function renderPRTable(rows) {
     const container = document.getElementById('pr-container');
     const dataRows = (rows[0] && rows[0][0] === "Name") ? rows.slice(1) : rows;
-    let html = `<table><thead><tr><th>Name</th><th>800m</th><th>1600m</th><th>3200m</th></tr></thead><tbody>`;
+
+    // Determine which arrow to show based on sort state
+    const getArrow = (col) => {
+        if (prSortState.column !== col) return "⇅";
+        return prSortState.ascending ? "▲" : "▼";
+    };
+
+    let html = `<table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>800m <button class="mini-sort" onclick="sortPRs(1)">${getArrow(1)}</button></th>
+                        <th>1600m <button class="mini-sort" onclick="sortPRs(2)">${getArrow(2)}</button></th>
+                        <th>3200m <button class="mini-sort" onclick="sortPRs(3)">${getArrow(3)}</button></th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
     dataRows.forEach(row => {
         if (row[0]) {
-            html += `<tr><td class="name-cell">${row[0]}</td><td>${row[1]||'--'}</td><td>${row[2]||'--'}</td><td>${row[3]||'--'}</td></tr>`;
+            html += `<tr>
+                <td class="name-cell">${row[0]}</td>
+                <td>${row[1] || '--'}</td>
+                <td>${row[2] || '--'}</td>
+                <td>${row[3] || '--'}</td>
+            </tr>`;
         }
     });
     container.innerHTML = html + "</tbody></table>";
 }
+
+// Helper to convert "4:30.5" into total seconds (270.5) for sorting
+function timeToSeconds(timeStr) {
+    // If empty, return a huge number so they stay at the bottom regardless of sort
+    if (!timeStr || timeStr === '--' || timeStr === '0' || timeStr === '') return 999999;
+    
+    const parts = timeStr.toString().split(':');
+    if (parts.length === 2) {
+        return (parseFloat(parts[0]) * 60) + parseFloat(parts[1]);
+    }
+    return parseFloat(timeStr);
+}
+
+// Update the sortPRs function to toggle
+window.sortPRs = function(columnIndex) {
+    let dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
+
+    // Toggle logic: If clicking the same column, flip the order. 
+    // If clicking a new column, start with Fastest (ascending).
+    if (prSortState.column === columnIndex) {
+        prSortState.ascending = !prSortState.ascending;
+    } else {
+        prSortState.column = columnIndex;
+        prSortState.ascending = true;
+    }
+
+    dataOnly.sort((a, b) => {
+        const timeA = timeToSeconds(a[columnIndex]);
+        const timeB = timeToSeconds(b[columnIndex]);
+        
+        return prSortState.ascending ? timeA - timeB : timeB - timeA;
+    });
+
+    renderPRTable(dataOnly);
+};
 
 window.filterPRs = function() {
     const searchTerm = document.getElementById('pr-search').value.toLowerCase();
     const dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
     const filtered = dataOnly.filter(row => row[0] && row[0].toLowerCase().includes(searchTerm));
     renderPRTable(filtered);
+};
+
+// Reset function to return to alphabetical (original) order
+window.resetPRs = function() {
+    prSortState = { column: null, ascending: true };
+    // Redraw using the full allPRs array (which is alphabetical from Sheets)
+    renderPRTable(allPRs);
 };
