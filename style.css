@@ -267,7 +267,7 @@ header, h2, h5, .controls {
 
 .insights-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 15px;
     margin-bottom: 20px;
 }
@@ -278,6 +278,16 @@ header, h2, h5, .controls {
     border-radius: 8px;
     border-left: 5px solid chocolate;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 75px;
+}
+
+@media (max-width: 600px) {
+    .insights-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .insight-card h3 {
@@ -295,7 +305,7 @@ header, h2, h5, .controls {
 }
 
 #season-leaderboard-container {
-    max-height: 700px;
+    max-height: 565px;
     overflow-y: auto;
     border: 1px solid #eee;
     border-radius: 8px;

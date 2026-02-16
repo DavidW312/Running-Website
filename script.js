@@ -15,6 +15,7 @@ window.onload = function() {
     fetchRaceResults();
 };
 
+// Function which initializes information from Google Sheets
 async function initDashboard() {
     const selector = document.getElementById('week-selector');
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}`;
@@ -25,7 +26,7 @@ async function initDashboard() {
         
         const weekSheets = spreadsheet.sheets
             .map(s => s.properties.title)
-            .filter(title => title.includes("Week"));
+            .filter(title => title.includes("Week")); // Filters Google Sheets tabs checking if they have the word "Week" in them
 
         // 1. Build Dropdown
         selector.innerHTML = "";
@@ -50,7 +51,7 @@ async function initDashboard() {
 }
 
 async function calculateSeasonAnalytics(weekNames) {
-    let seasonTotals = {}; 
+    let seasonTotals = {}; // This is a dictionary object used to track athlete's season totals for mileage
     let totalTeamMiles = 0; 
     let totalAbsences = 0; 
     let totalActiveDaysCount = 0; 
@@ -94,7 +95,7 @@ async function calculateSeasonAnalytics(weekNames) {
             activeColumns.forEach(col => {
                 const val = row[col];
                 
-                if (val === "A" || val === "INJ") {
+                if (val === "A" || val === "INJ" || val === "XA") {
                     totalAbsences++;
                     seasonTotals[name].absences++;
                 }
