@@ -48,9 +48,9 @@ async function initDashboard() {
 }
 
 async function calculateSeasonAnalytics(weekNames) {
-    let seasonTotals = {}; 
-    let totalTeamMiles = 0;
-    let totalAbsences = 0;
+    let seasonTotals = {}; // Dictionary for athlete-season mileage numbers
+    let totalTeamMiles = 0; // Total team mileage count
+    let totalAbsences = 0; // Total absences count
     let totalActiveDaysCount = 0; // Only counts days where data exists
 
     const promises = weekNames.map(name => 
