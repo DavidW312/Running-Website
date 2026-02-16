@@ -30,19 +30,6 @@
             </div>
         </section>
 
-        <section id="pr-section">
-            <h2>Personal Records</h2>
-            <h5>(Based strictly on Track Season times)</h5>
-            <div class="controls">
-                <input type="text" id="pr-search" placeholder="Search athlete..." onkeyup="filterPRs()">
-                <button onclick="resetPRs()" class="reset-btn">Reset Order</button>
-            </div>
-
-            <div id="pr-container">
-                <p>Loading PRs...</p>
-            </div>
-        </section>
-
         <section id="season-insights-section" style="flex: 1 1 100%;">
             <h2>Season Insights</h2>
             <div class="insights-grid">
@@ -63,6 +50,32 @@
             <div id="season-leaderboard-container">
                 </div>
         </section>
+
+        <section id="pr-section">
+            <h2>Personal Records</h2>
+            <h5>(Based strictly on Track Season times)</h5>
+            <div class="controls">
+                <input type="text" id="pr-search" placeholder="Search athlete..." onkeyup="filterPRs()">
+                <button onclick="resetPRs()" class="reset-btn">Reset Order</button>
+            </div>
+
+            <div id="pr-container">
+                <p>Loading PRs...</p>
+            </div>
+        </section>
+
+        <section id="results-section">
+            <h2>Meet Results</h2>
+            <div class="controls">
+                <label for="meet-selector">Select Meet:</label>
+                <select id="meet-selector" onchange="displaySelectedMeet()">
+                    <option value="">Loading meets...</option>
+                </select>
+            </div>
+            <div id="meet-results-container">
+                </div>
+        </section>
+        
     </main>
 
     <script src="script.js"></script>

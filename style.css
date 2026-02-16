@@ -15,10 +15,10 @@ header {
 
 /* Layout for the two sections (Mileage and PRs) */
 main {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 20px;
-    flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: start;
 }
 
 section {
@@ -26,8 +26,15 @@ section {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    flex: 1;
+    width: 100%;
     min-width: 400px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 900px){
+    main {
+        grid-template-columns: 1fr;
+    }
 }
 
 h2 {
@@ -288,9 +295,24 @@ header, h2, h5, .controls {
 }
 
 #season-leaderboard-container {
-    max-height: 465px;
+    max-height: 755px;
     overflow-y: auto;
     border: 1px solid #eee;
     border-radius: 8px;
     margin-top: 10px;
+}
+
+#meet-results-container {
+    max-height: 872px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+#meet-results-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: chocolate;
 }

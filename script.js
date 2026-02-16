@@ -6,11 +6,13 @@ let currentWeekData = [];
 let originalWeekData = [];
 let allPRs = [];
 let prSortState = { column: null, ascending: true };
+let allRaceData = []; // Global storage for results
 
 // Update existing window.onload
 window.onload = function() {
     initDashboard(); // Combined initialization
     fetchPRs();
+    fetchRaceResults();
 };
 
 async function initDashboard() {
@@ -334,4 +336,74 @@ function updateTimestamp() {
     };
     const timeString = now.toLocaleTimeString('en-US', options);
     document.getElementById('last-updated').textContent = `Synced with Google Sheets: ${timeString}`;
+}
+
+async function fetchRaceResults() {
+    const tabName = "Race_Results"; 
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tabName)}!A2:H?key=${API_KEY}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data.values || data.values.length === 0) {
+            document.getElementById('meet-results-container').innerHTML = "<p>No race results found yet.</p>";
+            return;
+        }
+
+        allRaceData = data.values;
+        populateMeetSelector(allRaceData);
+        // Default to showing the most recent meet (the last one in the list)
+        const lastMeet = allRaceData[allRaceData.length - 1][1];
+        document.getElementById('meet-selector').value = lastMeet;
+        displaySelectedMeet();
+
+    } catch (error) {
+        console.error("Race Results Error:", error);
+    }
+}
+
+function populateMeetSelector(rows) {
+    const selector = document.getElementById('meet-selector');
+    // Get unique meet names
+    const meets = [...new Set(rows.map(row => row[1]))].filter(m => m);
+    
+    selector.innerHTML = meets.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function displaySelectedMeet() {
+    const selectedMeet = document.getElementById('meet-selector').value;
+    const container = document.getElementById('meet-results-container');
+    
+    // Filter rows for the selected meet
+    const meetRows = allRaceData.filter(row => row[1] === selectedMeet);
+    
+    let html = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Athlete</th>
+                    <th>800m</th>
+                    <th>1600m</th>
+                    <th>3200m</th>
+                    <th>Relay Split</th>
+                    <th>Relay Event</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    meetRows.forEach(row => {
+        html += `
+            <tr>
+                <td class="name-cell">${row[0]}</td>
+                <td>${row[3] || '-'}</td>
+                <td>${row[4] || '-'}</td>
+                <td>${row[5] || '-'}</td>
+                <td>${row[6] || '-'}</td>
+                <td style="font-size: 0.85rem; color: #778;">${row[7] || '-'}</td>
+            </tr>`;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
 }
