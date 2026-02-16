@@ -191,13 +191,17 @@ thead tr:hover {
     border-color: chocolate;
 }
 /* 1. Center the headers and descriptions */
-header, h2, .controls {
+header, h2, h5, .controls {
     text-align: center;
     max-width: 100%;
     margin-left: auto;
     margin-right: auto;
     padding: 0 15px;
 }
+
+/* Trend Colors for Mileage Analytics */
+.trend-up { color: #27ae60; }
+.trend-down { color: #e67e22; }
 
 /* 2. Fix the "Bigger than the screen" issue */
 #mileage-container, #pr-container {
