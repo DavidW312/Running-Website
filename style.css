@@ -210,6 +210,37 @@ header, h2, .controls {
     border-collapse: collapse;
 }
 
+/* Limit the height of the PR Table */
+#mileage-container {
+    max-height: 700px; /* Adjust this number to make the "window" taller or shorter */
+    overflow-y: auto;  /* Adds the vertical scrollbar */
+    border: 1px solid #eee;
+    border-radius: 8px;
+}
+
+#mileage-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: chocolate; /* Matches your theme */
+}
+
+/* Limit the height of the PR Table */
+#pr-container {
+    max-height: 800px; /* Adjust this number to make the "window" taller or shorter */
+    overflow-y: auto;  /* Adds the vertical scrollbar */
+    border: 1px solid #eee;
+    border-radius: 8px;
+}
+
+#pr-container thead th, 
+#season-leaderboard-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: chocolate; /* Matches your theme */
+}
+
 /* 4. Make the buttons look better on small screens */
 .controls {
     display: flex;
@@ -248,8 +279,9 @@ header, h2, .controls {
 }
 
 #season-leaderboard-container {
-    max-height: 300px;
+    max-height: 465px;
     overflow-y: auto;
     border: 1px solid #eee;
     border-radius: 8px;
+    margin-top: 10px;
 }
