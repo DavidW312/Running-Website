@@ -50,13 +50,13 @@ async function initDashboard() {
 }
 
 async function calculateSeasonAnalytics(weekNames) {
-    let seasonTotals = {}; // Dictionary for athlete-season mileage numbers
-    let totalTeamMiles = 0; // Total team mileage count
-    let totalAbsences = 0; // Total absences count
-    let totalActiveDaysCount = 0; // Only counts days where data exists
+    let seasonTotals = {}; 
+    let totalTeamMiles = 0; 
+    let totalAbsences = 0; 
+    let totalActiveDaysCount = 0; 
 
     const promises = weekNames.map(name => 
-        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}!A2:H?key=${API_KEY}`)
+        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}!A2:I?key=${API_KEY}`)
         .then(res => res.json())
     );
 
@@ -65,12 +65,10 @@ async function calculateSeasonAnalytics(weekNames) {
     allWeeksData.forEach(week => {
         if (!week.values || week.values.length === 0) return;
 
-        // --- NEW: Identify which days (columns) actually have data ---
-        let activeColumns = []; // Will store indices 1-6 if the day is "active"
+        let activeColumns = []; 
         for (let col = 1; col <= 6; col++) {
             let columnHasData = week.values.some(row => {
                 const val = row[col];
-                // A day is active if someone has miles > 0 OR a status like A/INJ/XA
                 return (val && val !== "" && val !== "0" && val !== 0);
             });
             if (columnHasData) activeColumns.push(col);
@@ -80,26 +78,31 @@ async function calculateSeasonAnalytics(weekNames) {
             const name = row[0];
             if (!name) return;
 
+            // --- FIX START: Capture Group Info ---
             if (!seasonTotals[name]) {
-                seasonTotals[name] = { miles: 0, absences: 0 };
+                seasonTotals[name] = { 
+                    miles: 0, 
+                    absences: 0, 
+                    group: row[8] || "Unassigned" // Store the 9th column (index 8)
+                };
+            } else if (row[8]) {
+                // If the group is updated in a later week, update it here too
+                seasonTotals[name].group = row[8];
             }
+            // --- FIX END ---
 
-            // Only loop through columns that we verified have data
             activeColumns.forEach(col => {
                 const val = row[col];
                 
-                // Track Absences
                 if (val === "A" || val === "INJ") {
                     totalAbsences++;
                     seasonTotals[name].absences++;
                 }
 
-                // Track Miles
                 const m = getMileageValue(val);
                 seasonTotals[name].miles += m;
                 totalTeamMiles += m;
                 
-                // Track "Possible Days" only for active days
                 totalActiveDaysCount++;
             });
         });
@@ -109,26 +112,63 @@ async function calculateSeasonAnalytics(weekNames) {
 }
 
 function renderSeasonUI(totals, teamMiles, absences, possibleDays) {
-    // Update Stats Cards
+    // 1. Update Stats Cards
     document.getElementById('total-team-miles').textContent = Math.round(teamMiles);
     
-    const health = ((1 - (absences / possibleDays)) * 100).toFixed(1);
+    // Safety check for attendance (prevents 0/0 error)
+    const health = possibleDays > 0 
+        ? ((1 - (absences / possibleDays)) * 100).toFixed(1) 
+        : "100";
     document.getElementById('attendance-stat').textContent = `${health}%`;
 
-    // Sort leaderboard
+    // 2. Sort the overall leaderboard
     const sorted = Object.entries(totals).sort((a, b) => b[1].miles - a[1].miles);
     
     if (sorted.length > 0) {
         document.getElementById('season-leader').textContent = sorted[0][0];
     }
 
-    // Render Mini Leaderboard
-    let html = `<table><thead><tr><th>Rank</th><th>Name</th><th>Total Miles</th><th>Missed Days</th></tr></thead><tbody>`;
+    // 3. NEW: Group-Specific Leaders logic
+    const groupLeaders = {};
+    
+    // FIX: Changed 'seasonTotals' to 'totals' to match your function argument
+    Object.entries(totals).forEach(([name, data]) => {
+        const group = data.group || "Unassigned";
+        // Check if this runner is the new leader for their specific group
+        if (!groupLeaders[group] || data.miles > groupLeaders[group].miles) {
+            groupLeaders[group] = { name: name, miles: data.miles };
+        }
+    });
+
+    // 4. Generate HTML for the Group Leaderboard Card
+    let groupHtml = `<div class="group-leaders-list">`;
+    // Sort groups alphabetically (Group 1, Group 2, etc.)
+    const sortedGroups = Object.keys(groupLeaders).sort();
+    
+    for (const group of sortedGroups) {
+        const leader = groupLeaders[group];
+        groupHtml += `
+            <p style="margin: 5px 0; border-bottom: 1px solid #fdf5e6;">
+                <span style="color: chocolate; font-weight: bold;">${group}:</span> 
+                ${leader.name} (${leader.miles.toFixed(1)}mi)
+            </p>`;
+    }
+    groupHtml += `</div>`;
+    
+    // Ensure you have a div with this ID in your "Season Insights" card!
+    const groupContainer = document.getElementById('group-leaders-container');
+    if (groupContainer) {
+        groupContainer.innerHTML = groupHtml;
+    }
+
+    // 5. Render the Main Table Leaderboard
+    let html = `<table><thead><tr><th>Rank</th><th>Name</th><th>Group</th><th>Miles</th><th>Missed</th></tr></thead><tbody>`;
     sorted.forEach((entry, index) => {
         html += `<tr>
             <td>${index + 1}</td>
             <td class="name-cell">${entry[0]}</td>
-            <td>${entry[1].miles.toFixed(1)}</td>
+            <td style="font-size: 0.8rem; color: #667;">${entry[1].group || '-'}</td>
+            <td style="font-weight: bold; color: chocolate;">${entry[1].miles.toFixed(1)}</td>
             <td>${entry[1].absences}</td>
         </tr>`;
     });
@@ -141,7 +181,7 @@ async function fetchWeeklyData(tabName) {
     container.innerHTML = `<p>Loading ${tabName}...</p>`;
 
     const encodedTabName = encodeURIComponent(`'${tabName}'`);
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodedTabName}!A1:H?key=${API_KEY}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodedTabName}!A1:I?key=${API_KEY}`;
     
     try {
         const response = await fetch(url);
@@ -176,6 +216,15 @@ function getStatusClass(val) {
 // 4. Render Table
 function renderMileageTable(rows) {
     const container = document.getElementById('mileage-container');
+    
+    // 1. Sort the rows by the Group column (index 8)
+    // This keeps the groups together so the headers work correctly
+    const sortedRows = [...rows].sort((a, b) => {
+        const groupA = a[8] || "Unassigned";
+        const groupB = b[8] || "Unassigned";
+        return groupA.localeCompare(groupB);
+    });
+
     let htmlContent = `
         <table class="mileage-table">
             <thead>
@@ -187,25 +236,35 @@ function renderMileageTable(rows) {
             </thead>
             <tbody>`;
 
-    rows.forEach(row => {
-        if (row[0]) {
-            let calculatedTotal = 
-                getMileageValue(row[1]) + getMileageValue(row[2]) + 
-                getMileageValue(row[3]) + getMileageValue(row[4]) + 
-                getMileageValue(row[5]) + getMileageValue(row[6]);
+    let currentGroup = "";
 
+    sortedRows.forEach(row => {
+        if (!row[0]) return;
+
+        const athleteGroup = row[8] || "Unassigned";
+
+        // 2. Add a visual header whenever the group changes
+        if (athleteGroup !== currentGroup) {
+            currentGroup = athleteGroup;
             htmlContent += `
-                <tr>
-                    <td class="name-cell">${row[0]}</td>
-                    <td class="${getStatusClass(row[1])}">${row[1] || 0}</td>
-                    <td class="${getStatusClass(row[2])}">${row[2] || 0}</td>
-                    <td class="${getStatusClass(row[3])}">${row[3] || 0}</td>
-                    <td class="${getStatusClass(row[4])}">${row[4] || 0}</td>
-                    <td class="${getStatusClass(row[5])}">${row[5] || 0}</td>
-                    <td class="${getStatusClass(row[6])}">${row[6] || 0}</td>
-                    <td class="total-cell">${calculatedTotal.toFixed(1)}</td>
+                <tr class="group-header-row">
+                    <td colspan="8">${currentGroup}</td>
                 </tr>`;
         }
+
+        const currentTotal = getMileageValue(row[7]);
+
+        htmlContent += `
+            <tr>
+                <td class="name-cell">${row[0]}</td>
+                <td class="${getStatusClass(row[1])}">${row[1] || 0}</td>
+                <td class="${getStatusClass(row[2])}">${row[2] || 0}</td>
+                <td class="${getStatusClass(row[3])}">${row[3] || 0}</td>
+                <td class="${getStatusClass(row[4])}">${row[4] || 0}</td>
+                <td class="${getStatusClass(row[5])}">${row[5] || 0}</td>
+                <td class="${getStatusClass(row[6])}">${row[6] || 0}</td>
+                <td class="total-cell">${currentTotal.toFixed(1)}</td>
+            </tr>`;
     });
 
     htmlContent += "</tbody></table>";

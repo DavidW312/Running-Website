@@ -295,7 +295,7 @@ header, h2, h5, .controls {
 }
 
 #season-leaderboard-container {
-    max-height: 755px;
+    max-height: 700px;
     overflow-y: auto;
     border: 1px solid #eee;
     border-radius: 8px;
@@ -315,4 +315,26 @@ header, h2, h5, .controls {
     top: 0;
     z-index: 10;
     background-color: chocolate;
+}
+
+/* Styling for the Group Header Row */
+.group-header-row td {
+    background-color: #ffebc4; /* Light cream background */
+    color: #d2691e;           /* Chocolate text color */
+    font-weight: bold;
+    text-align: left !important;
+    padding: 10px 15px !important;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border-top: 2px solid #fdf5e6;
+    border-bottom: 1px solid #eee;
+}
+
+/* Make the group header "sticky" as well 
+   so you know what group you are looking at while scrolling */
+.group-header-row td {
+    position: sticky;
+    top: 40px; /* Sits right below the main table header */
+    z-index: 9;
 }
