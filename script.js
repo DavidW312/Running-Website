@@ -149,6 +149,7 @@ async function fetchWeeklyData(tabName) {
             originalWeekData = data.values.slice(1); 
             currentWeekData = [...originalWeekData]; 
             renderMileageTable(currentWeekData);
+            updateTimestamp();
         } else {
             container.innerHTML = `<p>No data found for ${tabName}.</p>`;
         }
@@ -322,3 +323,15 @@ window.resetPRs = function() {
     // Redraw using the full allPRs array (which is alphabetical from Sheets)
     renderPRTable(allPRs);
 };
+
+function updateTimestamp() {
+    const now = new Date();
+    const options = { 
+        month: 'short', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    };
+    const timeString = now.toLocaleTimeString('en-US', options);
+    document.getElementById('last-updated').textContent = `Synced with Google Sheets: ${timeString}`;
+}
