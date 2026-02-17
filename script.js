@@ -1,21 +1,29 @@
 const SHEET_ID = '1z-tYsvka0xCvYAp6iki0o5IIaUXi-ZOosnvUDxmylIA';
 const API_KEY = 'AIzaSyAijjbGyF0cY0BLgEa_LmkYjyL1UDnQVQ8';
 
-// Global variables
+// --- GLOBAL STATE ---
 let currentWeekData = [];
 let originalWeekData = [];
 let allPRs = [];
 let prSortState = { column: null, ascending: true };
-let allRaceData = []; // Global storage for results
+let allRaceData = []; 
 
-// Update existing window.onload
+// --- 1. INITIALIZATION ---
+
+/**
+ * Runs when the page loads. 
+ * Kicks off the three main data fetching branches.
+ */
 window.onload = function() {
-    initDashboard(); // Combined initialization
+    initDashboard(); 
     fetchPRs();
     fetchRaceResults();
 };
 
-// Function which initializes information from Google Sheets
+/**
+ * Connects to Google Sheets to find all tab names.
+ * Filters for "Week" tabs and builds the selection dropdown.
+ */
 async function initDashboard() {
     const selector = document.getElementById('week-selector');
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}`;
@@ -24,11 +32,12 @@ async function initDashboard() {
         const response = await fetch(url);
         const spreadsheet = await response.json();
         
+        // Find tabs that contain the word "Week"
         const weekSheets = spreadsheet.sheets
             .map(s => s.properties.title)
-            .filter(title => title.includes("Week")); // Filters Google Sheets tabs checking if they have the word "Week" in them
+            .filter(title => title.includes("Week"));
 
-        // 1. Build Dropdown
+        // Build the HTML Dropdown
         selector.innerHTML = "";
         weekSheets.forEach(title => {
             const option = document.createElement('option');
@@ -37,25 +46,34 @@ async function initDashboard() {
             selector.appendChild(option);
         });
 
+        // Listen for user changing the week
         selector.addEventListener('change', function() {
             fetchWeeklyData(this.value);
         });
 
-        // 2. Load Initial Week
+        // Load the most recent week by default
         if (weekSheets.length > 0) fetchWeeklyData(weekSheets[0]);
 
-        // 3. TRIGGER SEASON ANALYTICS
+        // Process all weeks for Season-Long Insights
         calculateSeasonAnalytics(weekSheets);
 
-    } catch (error) { console.error("Init Error:", error); }
+    } catch (error) { 
+        console.error("Critical Init Error:", error); 
+    }
 }
 
+// --- 2. SEASON ANALYTICS & INSIGHTS (2x2 Logic) ---
+
+/**
+ * Downloads every weekly sheet to calculate total mileage and attendance.
+ */
 async function calculateSeasonAnalytics(weekNames) {
-    let seasonTotals = {}; // This is a dictionary object used to track athlete's season totals for mileage
+    let seasonTotals = {}; 
     let totalTeamMiles = 0; 
     let totalAbsences = 0; 
     let totalActiveDaysCount = 0; 
 
+    // Fetch all tabs in parallel for speed
     const promises = weekNames.map(name => 
         fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}!A2:I?key=${API_KEY}`)
         .then(res => res.json())
@@ -66,6 +84,7 @@ async function calculateSeasonAnalytics(weekNames) {
     allWeeksData.forEach(week => {
         if (!week.values || week.values.length === 0) return;
 
+        // Determine which columns have actually been filled (prevents future 0s from hurting health %)
         let activeColumns = []; 
         for (let col = 1; col <= 6; col++) {
             let columnHasData = week.values.some(row => {
@@ -79,22 +98,22 @@ async function calculateSeasonAnalytics(weekNames) {
             const name = row[0];
             if (!name) return;
 
-            // --- FIX START: Capture Group Info ---
+            // Initialize runner record if new
             if (!seasonTotals[name]) {
                 seasonTotals[name] = { 
                     miles: 0, 
                     absences: 0, 
-                    group: row[8] || "Unassigned" // Store the 9th column (index 8)
+                    group: row[8] || "Unassigned" 
                 };
             } else if (row[8]) {
-                // If the group is updated in a later week, update it here too
+                // Update group to the most recent assignment
                 seasonTotals[name].group = row[8];
             }
-            // --- FIX END ---
 
             activeColumns.forEach(col => {
                 const val = row[col];
                 
+                // Track Absences (A), Excused (XA), or Injured (INJ)
                 if (val === "A" || val === "INJ" || val === "XA") {
                     totalAbsences++;
                     seasonTotals[name].absences++;
@@ -103,7 +122,6 @@ async function calculateSeasonAnalytics(weekNames) {
                 const m = getMileageValue(val);
                 seasonTotals[name].miles += m;
                 totalTeamMiles += m;
-                
                 totalActiveDaysCount++;
             });
         });
@@ -112,71 +130,83 @@ async function calculateSeasonAnalytics(weekNames) {
     renderSeasonUI(seasonTotals, totalTeamMiles, totalAbsences, totalActiveDaysCount);
 }
 
+/**
+ * Updates the UI cards and the season leaderboard.
+ */
 function renderSeasonUI(totals, teamMiles, absences, possibleDays) {
-    // 1. Update Stats Cards
-    document.getElementById('total-team-miles').textContent = Math.round(teamMiles);
+    // 1. Update Stats Cards (Miles and Health)
+    const teamMilesEl = document.getElementById('total-team-miles');
+    const healthEl = document.getElementById('attendance-stat');
     
-    // Safety check for attendance (prevents 0/0 error)
-    const health = possibleDays > 0 
-        ? ((1 - (absences / possibleDays)) * 100).toFixed(1) 
-        : "100";
-    document.getElementById('attendance-stat').textContent = `${health}%`;
-
-    // 2. Sort the overall leaderboard
-    const sorted = Object.entries(totals).sort((a, b) => b[1].miles - a[1].miles);
-    
-    if (sorted.length > 0) {
-        document.getElementById('season-leader').textContent = sorted[0][0];
+    if (teamMilesEl) teamMilesEl.textContent = Math.round(teamMiles);
+    if (healthEl) {
+        const health = possibleDays > 0 
+            ? ((1 - (absences / possibleDays)) * 100).toFixed(1) 
+            : "100";
+        healthEl.textContent = `${health}%`;
     }
 
-    // 3. NEW: Group-Specific Leaders logic
-    const groupLeaders = {};
+    // 2. Logic for Group Leaders (Splitting by Gender)
+    const girlsLeadersHtml = ["<h4>Girls</h4>"];
+    const boysLeadersHtml = ["<h4>Boys</h4>"];
     
-    // FIX: Changed 'seasonTotals' to 'totals' to match your function argument
+    const groupLeaders = {};
     Object.entries(totals).forEach(([name, data]) => {
-        const group = data.group || "Unassigned";
-        // Check if this runner is the new leader for their specific group
-        if (!groupLeaders[group] || data.miles > groupLeaders[group].miles) {
-            groupLeaders[group] = { name: name, miles: data.miles };
+        const gender = getGender(name);
+        const groupLabel = data.group || "Unassigned";
+        const uniqueKey = `${gender}: ${groupLabel}`;
+
+        if (!groupLeaders[uniqueKey] || data.miles > groupLeaders[uniqueKey].miles) {
+            groupLeaders[uniqueKey] = { name: name, miles: data.miles, gender: gender, group: groupLabel };
         }
     });
 
-    // 4. Generate HTML for the Group Leaderboard Card
-    let groupHtml = `<div class="group-leaders-list">`;
-    // Sort groups alphabetically (Group 1, Group 2, etc.)
-    const sortedGroups = Object.keys(groupLeaders).sort();
-    
-    for (const group of sortedGroups) {
-        const leader = groupLeaders[group];
-        groupHtml += `
-            <p style="margin: 5px 0; border-bottom: 1px solid #fdf5e6;">
-                <span style="color: chocolate; font-weight: bold;">${group}:</span> 
-                ${leader.name} (${leader.miles.toFixed(1)}mi)
+    // Sort the keys so they appear as Group 1, Group 2...
+    Object.keys(groupLeaders).sort().forEach(key => {
+        const leader = groupLeaders[key];
+        const itemHtml = `
+            <p style="margin: 3px 0; font-size: 0.85rem;">
+                <span style="font-weight: bold;">${leader.group}:</span> 
+                ${cleanName(leader.name)} (${leader.miles.toFixed(1)})
             </p>`;
-    }
-    groupHtml += `</div>`;
-    
-    // Ensure you have a div with this ID in your "Season Insights" card!
-    const groupContainer = document.getElementById('group-leaders-container');
-    if (groupContainer) {
-        groupContainer.innerHTML = groupHtml;
-    }
-
-    // 5. Render the Main Table Leaderboard
-    let html = `<table><thead><tr><th>Rank</th><th>Name</th><th>Group</th><th>Miles</th><th>Missed</th></tr></thead><tbody>`;
-    sorted.forEach((entry, index) => {
-        html += `<tr>
-            <td>${index + 1}</td>
-            <td class="name-cell">${entry[0]}</td>
-            <td style="font-size: 0.8rem; color: #667;">${entry[1].group || '-'}</td>
-            <td style="font-weight: bold; color: chocolate;">${entry[1].miles.toFixed(1)}</td>
-            <td>${entry[1].absences}</td>
-        </tr>`;
+        
+        if (leader.gender === "Girls") {
+            girlsLeadersHtml.push(itemHtml);
+        } else {
+            boysLeadersHtml.push(itemHtml);
+        }
     });
-    document.getElementById('season-leaderboard-container').innerHTML = html + "</tbody></table>";
+
+    // Inject into the two columns
+    const girlsCol = document.getElementById('girls-leaders-column');
+    const boysCol = document.getElementById('boys-leaders-column');
+    if (girlsCol) girlsCol.innerHTML = girlsLeadersHtml.join('');
+    if (boysCol) boysCol.innerHTML = boysLeadersHtml.join('');
+
+    // 3. Render the Main Table Leaderboard (Ensures this runs even if the above fails)
+    const leaderboardContainer = document.getElementById('season-leaderboard-container');
+    if (leaderboardContainer) {
+        const sorted = Object.entries(totals).sort((a, b) => b[1].miles - a[1].miles);
+        let html = `<table><thead><tr><th>Rank</th><th>Name</th><th>Group</th><th>Miles</th><th>Missed</th></tr></thead><tbody>`;
+        
+        sorted.forEach((entry, index) => {
+            html += `<tr>
+                <td>${index + 1}</td>
+                <td class="name-cell">${cleanName(entry[0])}</td>
+                <td style="font-size: 0.8rem; color: #667;">${getGender(entry[0])} ${entry[1].group || '-'}</td>
+                <td style="font-weight: bold; color: chocolate;">${entry[1].miles.toFixed(1)}</td>
+                <td>${entry[1].absences}</td>
+            </tr>`;
+        });
+        leaderboardContainer.innerHTML = html + "</tbody></table>";
+    }
 }
 
-// 2. Fetch Weekly Data
+// --- 3. WEEKLY MILEAGE TABLE LOGIC ---
+
+/**
+ * Fetches data for a specific tab/week.
+ */
 async function fetchWeeklyData(tabName) {
     const container = document.getElementById('mileage-container');
     container.innerHTML = `<p>Loading ${tabName}...</p>`;
@@ -196,34 +226,24 @@ async function fetchWeeklyData(tabName) {
         } else {
             container.innerHTML = `<p>No data found for ${tabName}.</p>`;
         }
-    } catch (error) {
-        console.error("Mileage Error:", error);
-    }
+    } catch (error) { console.error("Weekly Fetch Error:", error); }
 }
 
-// 3. Helpers for Math and Colors
-function getMileageValue(val) {
-    let num = parseFloat(val);
-    return isNaN(num) ? 0 : num;
-}
-
-function getStatusClass(val) {
-    if (val === "A") return "status-absent";
-    if (val === "XA") return "status-excused";
-    if (val === "INJ") return "status-injured";
-    return "";
-}
-
-// 4. Render Table
+/**
+ * Builds the mileage table with Gender and Group sorting.
+ */
 function renderMileageTable(rows) {
     const container = document.getElementById('mileage-container');
     
-    // 1. Sort the rows by the Group column (index 8)
-    // This keeps the groups together so the headers work correctly
+    // Primary Sort: Gender (F) vs Boys. Secondary Sort: Training Group.
     const sortedRows = [...rows].sort((a, b) => {
-        const groupA = a[8] || "Unassigned";
-        const groupB = b[8] || "Unassigned";
-        return groupA.localeCompare(groupB);
+        const genA = getGender(a[0]);
+        const genB = getGender(b[0]);
+        if (genA !== genB) return genA.localeCompare(genB);
+
+        const grpA = a[8] || "Unassigned";
+        const grpB = b[8] || "Unassigned";
+        return grpA.localeCompare(grpB);
     });
 
     let htmlContent = `
@@ -237,34 +257,35 @@ function renderMileageTable(rows) {
             </thead>
             <tbody>`;
 
-    let currentGroup = "";
+    let currentSection = "";
 
     sortedRows.forEach(row => {
         if (!row[0]) return;
 
-        const athleteGroup = row[8] || "Unassigned";
+        const gender = getGender(row[0]);
+        const group = row[8] || "Unassigned";
+        const sectionHeader = `Group ${group} ${gender}`;
 
-        // 2. Add a visual header whenever the group changes
-        if (athleteGroup !== currentGroup) {
-            currentGroup = athleteGroup;
+        if (sectionHeader !== currentSection) {
+            currentSection = sectionHeader;
             htmlContent += `
                 <tr class="group-header-row">
-                    <td colspan="8">${currentGroup}</td>
+                    <td colspan="8">${sectionHeader}</td>
                 </tr>`;
         }
 
-        const currentTotal = getMileageValue(row[7]);
+        const totalMiles = getMileageValue(row[7]);
 
         htmlContent += `
             <tr>
-                <td class="name-cell">${row[0]}</td>
+                <td class="name-cell">${cleanName(row[0])}</td>
                 <td class="${getStatusClass(row[1])}">${row[1] || 0}</td>
                 <td class="${getStatusClass(row[2])}">${row[2] || 0}</td>
                 <td class="${getStatusClass(row[3])}">${row[3] || 0}</td>
                 <td class="${getStatusClass(row[4])}">${row[4] || 0}</td>
                 <td class="${getStatusClass(row[5])}">${row[5] || 0}</td>
                 <td class="${getStatusClass(row[6])}">${row[6] || 0}</td>
-                <td class="total-cell">${currentTotal.toFixed(1)}</td>
+                <td class="total-cell">${totalMiles.toFixed(1)}</td>
             </tr>`;
     });
 
@@ -272,25 +293,55 @@ function renderMileageTable(rows) {
     container.innerHTML = htmlContent;
 }
 
-// 5. SORTING FUNCTIONS (Buttons)
+/**
+ * User-triggered sort to see the weekly mileage leaders.
+ */
 window.sortMileage = function() {
     if (currentWeekData.length === 0) return;
-    currentWeekData.sort((a, b) => {
-        const totalA = getMileageValue(a[1]) + getMileageValue(a[2]) + getMileageValue(a[3]) + 
-                       getMileageValue(a[4]) + getMileageValue(a[5]) + getMileageValue(a[6]);
-        const totalB = getMileageValue(b[1]) + getMileageValue(b[2]) + getMileageValue(b[3]) + 
-                       getMileageValue(b[4]) + getMileageValue(b[5]) + getMileageValue(b[6]);
-        return totalB - totalA;
-    });
+    currentWeekData.sort((a, b) => getMileageValue(b[7]) - getMileageValue(a[7]));
     renderMileageTable(currentWeekData);
 };
 
+/**
+ * Resets the table to the original Google Sheet order (Alphabetical/Grouped).
+ */
 window.resetSort = function() {
     currentWeekData = [...originalWeekData];
     renderMileageTable(currentWeekData);
 };
 
-// 6. PR FUNCTIONS
+
+// --- 4. PERSONAL RECORDS (PR) ENGINE ---
+
+/**
+ * STRICT PR LOGIC:
+ * 1. Must have a valid race time (not '-', '0', or empty).
+ * 2. If PR is empty/--: Highlight as a "Debut".
+ * 3. If PR exists: Highlight only if race time is faster.
+ */
+function isNewPR(raceTimeStr, prTimeStr) {
+    // RULE 1: If there is no race result, it can't be a PR.
+    if (!raceTimeStr || raceTimeStr === '-' || raceTimeStr === '0' || raceTimeStr.trim() === '') {
+        return false;
+    }
+    
+    // RULE 2: If the athlete has NO recorded PR yet (Debut)
+    const isFirstTime = (!prTimeStr || prTimeStr === '--' || prTimeStr.trim() === '');
+    if (isFirstTime) {
+        return true; 
+    }
+
+    // RULE 3: Comparison for existing PRs
+    const raceSec = timeToSeconds(raceTimeStr);
+    const prSec = timeToSeconds(prTimeStr);
+    
+    // Only return true if they actually improved (raceSec is smaller than prSec)
+    return (raceSec > 0 && raceSec < prSec);
+}
+
+/**
+ * Fetches the PR tab.
+ */
 async function fetchPRs() {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/PRs!A1:D?key=${API_KEY}`;
     try {
@@ -300,14 +351,16 @@ async function fetchPRs() {
             allPRs = data.values; 
             renderPRTable(allPRs);
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("PR Fetch Error:", e); }
 }
 
+/**
+ * Renders the PR table with clean names and sort arrows.
+ */
 function renderPRTable(rows) {
     const container = document.getElementById('pr-container');
     const dataRows = (rows[0] && rows[0][0] === "Name") ? rows.slice(1) : rows;
 
-    // Determine which arrow to show based on sort state
     const getArrow = (col) => {
         if (prSortState.column !== col) return "⇅";
         return prSortState.ascending ? "▲" : "▼";
@@ -327,7 +380,7 @@ function renderPRTable(rows) {
     dataRows.forEach(row => {
         if (row[0]) {
             html += `<tr>
-                <td class="name-cell">${row[0]}</td>
+                <td class="name-cell">${cleanName(row[0])}</td>
                 <td>${row[1] || '--'}</td>
                 <td>${row[2] || '--'}</td>
                 <td>${row[3] || '--'}</td>
@@ -337,41 +390,28 @@ function renderPRTable(rows) {
     container.innerHTML = html + "</tbody></table>";
 }
 
-// Helper to convert "4:30.5" into total seconds (270.5) for sorting
-function timeToSeconds(timeStr) {
-    // If empty, return a huge number so they stay at the bottom regardless of sort
-    if (!timeStr || timeStr === '--' || timeStr === '0' || timeStr === '') return 999999;
-    
-    const parts = timeStr.toString().split(':');
-    if (parts.length === 2) {
-        return (parseFloat(parts[0]) * 60) + parseFloat(parts[1]);
-    }
-    return parseFloat(timeStr);
-}
-
-// Update the sortPRs function to toggle
+/**
+ * Handles toggling between ascending/descending for PR times.
+ */
 window.sortPRs = function(columnIndex) {
     let dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
-
-    // Toggle logic: If clicking the same column, flip the order. 
-    // If clicking a new column, start with Fastest (ascending).
     if (prSortState.column === columnIndex) {
         prSortState.ascending = !prSortState.ascending;
     } else {
         prSortState.column = columnIndex;
         prSortState.ascending = true;
     }
-
     dataOnly.sort((a, b) => {
         const timeA = timeToSeconds(a[columnIndex]);
         const timeB = timeToSeconds(b[columnIndex]);
-        
         return prSortState.ascending ? timeA - timeB : timeB - timeA;
     });
-
     renderPRTable(dataOnly);
 };
 
+/**
+ * Filters PR table based on name search.
+ */
 window.filterPRs = function() {
     const searchTerm = document.getElementById('pr-search').value.toLowerCase();
     const dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
@@ -379,91 +419,127 @@ window.filterPRs = function() {
     renderPRTable(filtered);
 };
 
-// Reset function to return to alphabetical (original) order
+/**
+ * Resets PRs to alphabetical.
+ */
 window.resetPRs = function() {
     prSortState = { column: null, ascending: true };
-    // Redraw using the full allPRs array (which is alphabetical from Sheets)
     renderPRTable(allPRs);
 };
 
-function updateTimestamp() {
-    const now = new Date();
-    const options = { 
-        month: 'short', 
-        day: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    };
-    const timeString = now.toLocaleTimeString('en-US', options);
-    document.getElementById('last-updated').textContent = `Synced with Google Sheets: ${timeString}`;
-}
+// --- 5. MEET RESULTS ENGINE ---
 
+/**
+ * Fetches the Race Results tab.
+ */
 async function fetchRaceResults() {
-    const tabName = "Race_Results"; 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tabName)}!A2:H?key=${API_KEY}`;
-
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Race_Results!A2:H?key=${API_KEY}`;
     try {
         const response = await fetch(url);
         const data = await response.json();
         
         if (!data.values || data.values.length === 0) {
-            document.getElementById('meet-results-container').innerHTML = "<p>No race results found yet.</p>";
+            document.getElementById('meet-results-container').innerHTML = "<p>No race results found.</p>";
             return;
         }
 
         allRaceData = data.values;
         populateMeetSelector(allRaceData);
-        // Default to showing the most recent meet (the last one in the list)
+        
         const lastMeet = allRaceData[allRaceData.length - 1][1];
         document.getElementById('meet-selector').value = lastMeet;
         displaySelectedMeet();
 
-    } catch (error) {
-        console.error("Race Results Error:", error);
-    }
+    } catch (error) { console.error("Race Results Error:", error); }
 }
 
 function populateMeetSelector(rows) {
     const selector = document.getElementById('meet-selector');
-    // Get unique meet names
     const meets = [...new Set(rows.map(row => row[1]))].filter(m => m);
-    
     selector.innerHTML = meets.map(m => `<option value="${m}">${m}</option>`).join('');
 }
 
-function displaySelectedMeet() {
+/**
+ * THE SMART DISPLAY FUNCTION
+ * Checks for PRs and highlights them in green with a star.
+ */
+window.displaySelectedMeet = function() {
     const selectedMeet = document.getElementById('meet-selector').value;
     const container = document.getElementById('meet-results-container');
-    
-    // Filter rows for the selected meet
     const meetRows = allRaceData.filter(row => row[1] === selectedMeet);
     
-    let html = `
-        <table>
-            <thead>
-                <tr>
-                    <th>Athlete</th>
-                    <th>800m</th>
-                    <th>1600m</th>
-                    <th>3200m</th>
-                    <th>Relay Split</th>
-                    <th>Relay Event</th>
-                </tr>
-            </thead>
-            <tbody>`;
+    let html = `<table><thead><tr>
+                <th>Athlete</th>
+                <th>800m</th>
+                <th>1600m</th>
+                <th>3200m</th>
+                <th>Relay Split</th>
+                <th>Relay Event</th>
+                </tr></thead><tbody>`;
 
     meetRows.forEach(row => {
-        html += `
-            <tr>
-                <td class="name-cell">${row[0]}</td>
-                <td>${row[3] || '-'}</td>
-                <td>${row[4] || '-'}</td>
-                <td>${row[5] || '-'}</td>
+        const athleteName = row[0] || "";
+        
+        // Find the PR row
+        const athletePR = allPRs.find(p => {
+            return (p[0] || "").trim().toLowerCase() === athleteName.trim().toLowerCase();
+        }) || [];
+
+        const formatCell = (raceTime, prTime) => {
+            // Check Rule 1 immediately: No time = No highlight
+            if (!raceTime || raceTime === '-' || raceTime === '0' || raceTime.trim() === '') return '-';
+            
+            if (isNewPR(raceTime, prTime)) {
+                return `<span class="pr-highlight">${raceTime} <span class="pr-star">⭐</span></span>`;
+            }
+            return raceTime;
+        };
+
+        html += `<tr>
+                <td class="name-cell">${cleanName(athleteName)}</td>
+                <td>${formatCell(row[3], athletePR[1])}</td>
+                <td>${formatCell(row[4], athletePR[2])}</td>
+                <td>${formatCell(row[5], athletePR[3])}</td>
                 <td>${row[6] || '-'}</td>
                 <td style="font-size: 0.85rem; color: #778;">${row[7] || '-'}</td>
             </tr>`;
     });
+    container.innerHTML = html + "</tbody></table>";
+};
 
-    html += `</tbody></table>`;
-    container.innerHTML = html;
+// --- 6. UTILITY HELPERS ---
+
+function getGender(name) {
+    return name && name.includes("(F)") ? "Girls" : "Boys";
+}
+
+function cleanName(name) {
+    return name ? name.replace("(F)", "").trim() : "";
+}
+
+function getMileageValue(val) {
+    let num = parseFloat(val);
+    return isNaN(num) ? 0 : num;
+}
+
+function getStatusClass(val) {
+    if (val === "A") return "status-absent";
+    if (val === "XA") return "status-excused";
+    if (val === "INJ") return "status-injured";
+    return "";
+}
+
+function timeToSeconds(timeStr) {
+    if (!timeStr || timeStr === '--' || timeStr === '-' || timeStr === '0' || timeStr === '') return 999999;
+    const parts = timeStr.toString().split(':');
+    if (parts.length === 2) {
+        return (parseFloat(parts[0]) * 60) + parseFloat(parts[1]);
+    }
+    return parseFloat(timeStr);
+}
+
+function updateTimestamp() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    document.getElementById('last-updated').textContent = `Synced with Google Sheets: ${timeString}`;
 }
