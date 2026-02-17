@@ -14,9 +14,9 @@ let allRaceData = [];
  * Runs when the page loads. 
  * Kicks off the three main data fetching branches.
  */
-window.onload = function() {
-    initDashboard(); 
-    fetchPRs();
+window.onload = async function() {
+    await fetchPRs();
+    initDashboard();
     fetchRaceResults();
 };
 
@@ -335,8 +335,9 @@ function isNewPR(raceTimeStr, prTimeStr) {
     const raceSec = timeToSeconds(raceTimeStr);
     const prSec = timeToSeconds(prTimeStr);
     
-    // Only return true if they actually improved (raceSec is smaller than prSec)
-    return (raceSec > 0 && raceSec < prSec);
+    // Only return true if they actually improved (raceSec is smaller than prSec (or equal to, in case of updating the PR Table,
+    // so it still displays that that person PR'd at that meet))
+    return (raceSec > 0 && raceSec <= prSec);
 }
 
 /**
@@ -350,8 +351,12 @@ async function fetchPRs() {
         if (data.values) {
             allPRs = data.values; 
             renderPRTable(allPRs);
+            return true; // Send signal that data is loaded
         }
-    } catch (e) { console.error("PR Fetch Error:", e); }
+    } catch (e) { 
+        console.error("PR Fetch Error:", e); 
+        return false;
+    }
 }
 
 /**
@@ -464,6 +469,12 @@ function populateMeetSelector(rows) {
  * Checks for PRs and highlights them in green with a star.
  */
 window.displaySelectedMeet = function() {
+    if (allPRs.length === 0) {
+        console.log("PR data not ready... retrying in 100ms");
+        setTimeout(displaySelectedMeet, 100);
+        return;
+    }
+    
     const selectedMeet = document.getElementById('meet-selector').value;
     const container = document.getElementById('meet-results-container');
     const meetRows = allRaceData.filter(row => row[1] === selectedMeet);
