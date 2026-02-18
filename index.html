@@ -13,6 +13,14 @@
         <p id="last-updated" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
     </header>
 
+    <div class="view-controls">
+        <button class="view-btn active" data-section="all">Dashboard View</button>
+        <button class="view-btn active" data-section="mileage">Weekly Mileage</button>
+        <button class="view-btn active" data-section="season">Season Insights</button>
+        <button class="view-btn active" data-section="pr">PRs</button>
+        <button class="view-btn active" data-section="results">Meet Results</button>
+    </div>
+    
     <main>
         <section id="mileage-section">
             <h2>Weekly Mileage</h2>
@@ -72,12 +80,16 @@
 
         <section id="results-section">
             <h2>Meet Results</h2>
-            <div class="controls">
-                <label for="meet-selector">Select Meet:</label>
-                <select id="meet-selector" onchange="displaySelectedMeet()">
-                    <option value="">Loading meets...</option>
-                </select>
+            <div class="controls meet-controls">
+                <label for="meet-selector">Select Meet</label>
+                <div class="custom-select-wrapper">
+                    <select id="meet-selector" onchange="displaySelectedMeet()">
+                        <option value="">Loading meets...</option>
+                    </select>
+                    <span class="select-arrow">▾</span>
+                </div>
             </div>
+            
             <div id="meet-results-container">
                 </div>
         </section>

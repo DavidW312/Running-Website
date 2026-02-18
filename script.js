@@ -554,3 +554,73 @@ function updateTimestamp() {
     const timeString = now.toLocaleTimeString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     document.getElementById('last-updated').textContent = `Synced with Google Sheets: ${timeString}`;
 }
+
+// --- 7. ADVANCED TOGGLE VIEW SYSTEM ---
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const buttons = document.querySelectorAll(".view-btn");
+    const main = document.querySelector("main");
+
+    const sectionMap = {
+        mileage: document.getElementById("mileage-section"),
+        season: document.getElementById("season-insights-section"),
+        pr: document.getElementById("pr-section"),
+        results: document.getElementById("results-section")
+    };
+
+    buttons.forEach(button => {
+        button.addEventListener("click", () => {
+
+            const section = button.dataset.section;
+
+            // ALL BUTTON LOGIC
+            if (section === "all") {
+                const isActive = button.classList.contains("active");
+
+                if (isActive) {
+                    // Turn everything off
+                    buttons.forEach(b => b.classList.remove("active"));
+                    Object.values(sectionMap).forEach(sec => sec.classList.add("hidden-section"));
+                } else {
+                    // Turn everything on
+                    buttons.forEach(b => b.classList.add("active"));
+                    Object.values(sectionMap).forEach(sec => sec.classList.remove("hidden-section"));
+                }
+
+            } else {
+
+                // Toggle individual section
+                button.classList.toggle("active");
+                sectionMap[section].classList.toggle("hidden-section");
+
+                // Sync ALL button
+                const allButton = document.querySelector('[data-section="all"]');
+                const allIndividualActive = [...buttons]
+                    .filter(b => b.dataset.section !== "all")
+                    .every(b => b.classList.contains("active"));
+
+                if (allIndividualActive) {
+                    allButton.classList.add("active");
+                } else {
+                    allButton.classList.remove("active");
+                }
+            }
+
+            updateGridLayout();
+        });
+    });
+
+    function updateGridLayout() {
+        const visibleSections = Object.values(sectionMap)
+            .filter(sec => !sec.classList.contains("hidden-section"));
+
+        if (visibleSections.length <= 1) {
+            main.style.gridTemplateColumns = "1fr";
+        } else {
+            main.style.gridTemplateColumns = "1fr 1fr";
+        }
+    }
+
+});
+
