@@ -469,54 +469,101 @@ function populateMeetSelector(rows) {
  * Checks for PRs and highlights them in green with a star.
  */
 window.displaySelectedMeet = function() {
+
     if (allPRs.length === 0) {
-        console.log("PR data not ready... retrying in 100ms");
         setTimeout(displaySelectedMeet, 100);
         return;
     }
-    
+
     const selectedMeet = document.getElementById('meet-selector').value;
     const container = document.getElementById('meet-results-container');
     const meetRows = allRaceData.filter(row => row[1] === selectedMeet);
-    
-    let html = `<table><thead><tr>
+
+    let totalPerformances = 0;
+    let totalPRs = 0;
+
+    let html = `<table>
+        <thead>
+            <tr>
                 <th>Athlete</th>
                 <th>800m</th>
                 <th>1600m</th>
                 <th>3200m</th>
                 <th>Relay Split</th>
                 <th>Relay Event</th>
-                </tr></thead><tbody>`;
+            </tr>
+        </thead>
+        <tbody>`;
 
     meetRows.forEach(row => {
+
         const athleteName = row[0] || "";
-        
-        // Find the PR row
-        const athletePR = allPRs.find(p => {
-            return (p[0] || "").trim().toLowerCase() === athleteName.trim().toLowerCase();
-        }) || [];
+
+        const athletePR = allPRs.find(p =>
+            (p[0] || "").trim().toLowerCase() === athleteName.trim().toLowerCase()
+        ) || [];
 
         const formatCell = (raceTime, prTime) => {
-            // Check Rule 1 immediately: No time = No highlight
-            if (!raceTime || raceTime === '-' || raceTime === '0' || raceTime.trim() === '') return '-';
-            
-            if (isNewPR(raceTime, prTime)) {
-                return `<span class="pr-highlight">${raceTime} <span class="pr-star">⭐</span></span>`;
+
+            if (!raceTime || raceTime === '-' || raceTime === '0' || raceTime.trim() === '') {
+                return '-';
             }
+
+            totalPerformances++;
+
+            if (isNewPR(raceTime, prTime)) {
+                totalPRs++;
+
+                const deltaText = formatTimeDelta(prTime, raceTime);
+
+                return `
+                    <span class="pr-highlight">
+                        ${raceTime}
+                        <span class="pr-star">⭐</span>
+                        <span class="pr-delta">${deltaText}</span>
+                    </span>
+                `;
+            }
+
             return raceTime;
         };
 
-        html += `<tr>
+        html += `
+            <tr>
                 <td class="name-cell">${cleanName(athleteName)}</td>
                 <td>${formatCell(row[3], athletePR[1])}</td>
                 <td>${formatCell(row[4], athletePR[2])}</td>
                 <td>${formatCell(row[5], athletePR[3])}</td>
                 <td>${row[6] || '-'}</td>
                 <td style="font-size: 0.85rem; color: #778;">${row[7] || '-'}</td>
-            </tr>`;
+            </tr>
+        `;
     });
-    container.innerHTML = html + "</tbody></table>";
+
+    html += "</tbody></table>";
+
+    // Calculate PR %
+    let prRate = 0;
+    if (totalPerformances > 0) {
+        prRate = ((totalPRs / totalPerformances) * 100).toFixed(1);
+    }
+
+    // Assuming you already have your meetRows filtered for the selected meet
+    let relayCount = meetRows.filter(row => row[6] && row[6].trim() !== '' && row[6] !== '-' && row[6] !== '0').length;
+
+    const summaryHTML = `
+        <div class="meet-summary">
+            <h3>${selectedMeet}</h3>
+            <p>
+                <strong>PR Rate:</strong> ${prRate}% 
+                (${totalPRs} PRs out of ${totalPerformances} individual races), (${relayCount} relay performances)
+            </p>
+        </div>
+    `;
+
+    container.innerHTML = summaryHTML + html;
 };
+
 
 // --- 6. UTILITY HELPERS ---
 
@@ -547,6 +594,21 @@ function timeToSeconds(timeStr) {
         return (parseFloat(parts[0]) * 60) + parseFloat(parts[1]);
     }
     return parseFloat(timeStr);
+}
+
+function formatTimeDelta(oldTimeStr, newTimeStr) {
+    const oldSec = timeToSeconds(oldTimeStr);
+    const newSec = timeToSeconds(newTimeStr);
+
+    if (oldSec === 999999) {
+        return "(Debut)";
+    }
+
+    const diff = oldSec - newSec;
+
+    if (diff <= 0) return ""; // no improvement
+
+    return `(-${diff.toFixed(1)}s)`;
 }
 
 function updateTimestamp() {

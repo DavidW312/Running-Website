@@ -127,6 +127,37 @@ thead tr:hover {
     vertical-align: middle;
 }
 
+.pr-delta {
+    margin-left: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e8449; /* darker green */
+}
+
+/* ==========================================
+   MEET SUMMARY HEADER
+========================================== */
+
+.meet-summary {
+    background: #fff5ee;
+    border-left: 6px solid chocolate;
+    padding: 12px 18px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.meet-summary h3 {
+    margin: 0 0 6px 0;
+    color: chocolate;
+}
+
+.meet-summary p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #444;
+}
+
 /* ==========================================
    SOFT MODERN VIEW TOGGLE BUTTONS
 ========================================== */
