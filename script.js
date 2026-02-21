@@ -26,7 +26,7 @@ window.onload = async function() {
  */
 async function initDashboard() {
     const selector = document.getElementById('week-selector');
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}&t=${Date.now()}`;
 
     try {
         const response = await fetch(url);
@@ -73,9 +73,11 @@ async function calculateSeasonAnalytics(weekNames) {
     let totalAbsences = 0; 
     let totalActiveDaysCount = 0; 
 
-    // Fetch all tabs in parallel for speed
+    const weekDaysCols = [2,3,4,5,6,7]; // mon→sat
+
+    // Fetch all tabs in parallel
     const promises = weekNames.map(name => 
-        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}!A2:I?key=${API_KEY}`)
+        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}!A2:J?key=${API_KEY}`)
         .then(res => res.json())
     );
 
@@ -84,45 +86,43 @@ async function calculateSeasonAnalytics(weekNames) {
     allWeeksData.forEach(week => {
         if (!week.values || week.values.length === 0) return;
 
-        // Determine which columns have actually been filled (prevents future 0s from hurting health %)
-        let activeColumns = []; 
-        for (let col = 1; col <= 6; col++) {
-            let columnHasData = week.values.some(row => {
-                const val = row[col];
-                return (val && val !== "" && val !== "0" && val !== 0);
-            });
-            if (columnHasData) activeColumns.push(col);
-        }
-
         week.values.forEach(row => {
-            const name = row[0];
+            const name = buildName(row);
             if (!name) return;
 
-            // Initialize runner record if new
             if (!seasonTotals[name]) {
                 seasonTotals[name] = { 
-                    miles: 0, 
-                    absences: 0, 
-                    group: row[8] || "Unassigned" 
+                    miles: 0,
+                    absences: 0,
+                    A: 0,
+                    XA: 0,
+                    INJ: 0,
+                    group: row[9] || "Unassigned" // column J
                 };
-            } else if (row[8]) {
-                // Update group to the most recent assignment
-                seasonTotals[name].group = row[8];
+            } else if (row[9]) {
+                seasonTotals[name].group = row[9];
             }
 
-            activeColumns.forEach(col => {
-                const val = row[col];
-                
-                // Track Absences (A), Excused (XA), or Injured (INJ)
+            weekDaysCols.forEach(col => {
+                let val = row[col];
+
+                // Count absences only for A/XA/INJ
                 if (val === "A" || val === "INJ" || val === "XA") {
                     totalAbsences++;
                     seasonTotals[name].absences++;
+                    seasonTotals[name][val]++;
                 }
 
+                // Count mileage (0 if empty)
                 const m = getMileageValue(val);
                 seasonTotals[name].miles += m;
                 totalTeamMiles += m;
-                totalActiveDaysCount++;
+
+                // Count any entered value as an active day
+                // If val is empty string or undefined, treat as P only if other entries exist in that column
+                if (val && val !== "") {
+                    totalActiveDaysCount++;
+                }
             });
         });
     });
@@ -187,7 +187,7 @@ function renderSeasonUI(totals, teamMiles, absences, possibleDays) {
     const leaderboardContainer = document.getElementById('season-leaderboard-container');
     if (leaderboardContainer) {
         const sorted = Object.entries(totals).sort((a, b) => b[1].miles - a[1].miles);
-        let html = `<table><thead><tr><th>Rank</th><th>Name</th><th>Group</th><th>Miles</th><th>Missed</th></tr></thead><tbody>`;
+        let html = `<table><thead><tr><th>Rank</th><th>Name</th><th>Group</th><th>Miles</th><th>Missed(A/XA/INJ)</th></tr></thead><tbody>`;
         
         sorted.forEach((entry, index) => {
             html += `<tr>
@@ -195,7 +195,16 @@ function renderSeasonUI(totals, teamMiles, absences, possibleDays) {
                 <td class="name-cell">${cleanName(entry[0])}</td>
                 <td style="font-size: 0.8rem; color: #667;">${getGender(entry[0])} ${entry[1].group || '-'}</td>
                 <td style="font-weight: bold; color: chocolate;">${entry[1].miles.toFixed(1)}</td>
-                <td>${entry[1].absences}</td>
+                <td>
+                    ${entry[1].absences}
+                    <span class="miss-breakdown">
+                        (
+                        <span class="miss-a">${entry[1].A}</span> /
+                        <span class="miss-xa">${entry[1].XA}</span> /
+                        <span class="miss-inj">${entry[1].INJ}</span>
+                        )
+                    </span>
+                </td>
             </tr>`;
         });
         leaderboardContainer.innerHTML = html + "</tbody></table>";
@@ -212,7 +221,7 @@ async function fetchWeeklyData(tabName) {
     container.innerHTML = `<p>Loading ${tabName}...</p>`;
 
     const encodedTabName = encodeURIComponent(`'${tabName}'`);
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodedTabName}!A1:I?key=${API_KEY}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodedTabName}!A1:J?key=${API_KEY}`;
     
     try {
         const response = await fetch(url);
@@ -234,16 +243,24 @@ async function fetchWeeklyData(tabName) {
  */
 function renderMileageTable(rows) {
     const container = document.getElementById('mileage-container');
-    
-    // Primary Sort: Gender (F) vs Boys. Secondary Sort: Training Group.
+
+    // Sort: Gender → Group
     const sortedRows = [...rows].sort((a, b) => {
-        const genA = getGender(a[0]);
-        const genB = getGender(b[0]);
+        const genA = getGender(buildName(a));
+        const genB = getGender(buildName(b));
+
         if (genA !== genB) return genA.localeCompare(genB);
 
-        const grpA = a[8] || "Unassigned";
-        const grpB = b[8] || "Unassigned";
+        const grpA = a[9] || "Unassigned"; // column J
+        const grpB = b[9] || "Unassigned";
         return grpA.localeCompare(grpB);
+    });
+
+    // Determine which weekday columns have any data (even A/XA/INJ)
+    const weekdayCols = [2,3,4,5,6,7]; // Mon→Sat
+    const activeWeekdays = {};
+    weekdayCols.forEach(colIdx => {
+        activeWeekdays[colIdx] = rows.some(row => row[colIdx] && row[colIdx].toString().trim() !== '');
     });
 
     let htmlContent = `
@@ -260,10 +277,10 @@ function renderMileageTable(rows) {
     let currentSection = "";
 
     sortedRows.forEach(row => {
-        if (!row[0]) return;
+        if (!row[0] && !row[1]) return;
 
-        const gender = getGender(row[0]);
-        const group = row[8] || "Unassigned";
+        const gender = getGender(buildName(row));
+        const group = row[9] || "Unassigned";
         const sectionHeader = `Group ${group} ${gender}`;
 
         if (sectionHeader !== currentSection) {
@@ -274,19 +291,24 @@ function renderMileageTable(rows) {
                 </tr>`;
         }
 
-        const totalMiles = getMileageValue(row[7]);
+        const totalMiles = getMileageValue(row[8]); // column I
 
-        htmlContent += `
-            <tr>
-                <td class="name-cell">${cleanName(row[0])}</td>
-                <td class="${getStatusClass(row[1])}">${row[1] || 0}</td>
-                <td class="${getStatusClass(row[2])}">${row[2] || 0}</td>
-                <td class="${getStatusClass(row[3])}">${row[3] || 0}</td>
-                <td class="${getStatusClass(row[4])}">${row[4] || 0}</td>
-                <td class="${getStatusClass(row[5])}">${row[5] || 0}</td>
-                <td class="${getStatusClass(row[6])}">${row[6] || 0}</td>
-                <td class="total-cell">${totalMiles.toFixed(1)}</td>
-            </tr>`;
+        htmlContent += `<tr>
+            <td class="name-cell">${cleanName(buildName(row))}</td>`;
+
+        // Weekday columns
+        weekdayCols.forEach(colIdx => {
+            let val = row[colIdx];
+
+            // If the column has any entry and this cell is empty, mark as P
+            if ((!val || val === "") && activeWeekdays[colIdx]) {
+                val = "P";
+            }
+
+            htmlContent += `<td class="${getStatusClass(val)}">${val}</td>`;
+        });
+
+        htmlContent += `<td class="total-cell">${totalMiles.toFixed(1)}</td></tr>`;
     });
 
     htmlContent += "</tbody></table>";
@@ -298,7 +320,7 @@ function renderMileageTable(rows) {
  */
 window.sortMileage = function() {
     if (currentWeekData.length === 0) return;
-    currentWeekData.sort((a, b) => getMileageValue(b[7]) - getMileageValue(a[7]));
+    currentWeekData.sort((a, b) => getMileageValue(b[8]) - getMileageValue(a[8]));
     renderMileageTable(currentWeekData);
 };
 
@@ -567,6 +589,12 @@ window.displaySelectedMeet = function() {
 
 // --- 6. UTILITY HELPERS ---
 
+function buildName(row) {
+    const last = row[0] || "";
+    const first = row[1] || "";
+    return `${first} ${last}`.trim();
+}
+
 function getGender(name) {
     return name && name.includes("(F)") ? "Girls" : "Boys";
 }
@@ -584,6 +612,7 @@ function getStatusClass(val) {
     if (val === "A") return "status-absent";
     if (val === "XA") return "status-excused";
     if (val === "INJ") return "status-injured";
+    if (val === "P") return "status-present";
     return "";
 }
 

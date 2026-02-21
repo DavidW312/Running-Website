@@ -375,6 +375,32 @@ thead tr:hover {
     background-color: #ebf5fb;
 }
 
+.status-present {
+    color:#1e8449;
+    font-weight: bold;
+    background-color: #e6f7e6;
+}
+
+.miss-breakdown {
+    font-size: 0.85rem;
+    margin-left: 4px;
+}
+
+.miss-a {
+    color: #d64545;
+    font-weight: 700;
+}
+
+.miss-xa {
+    color: #f59e0b;
+    font-weight: 700;
+}
+
+.miss-inj {
+    color: #3b82f6;
+    font-weight: 700;
+}
+
 /* ==========================================================================
    5. SEASON INSIGHTS (The 2x2 Grid + Wide Leader Card)
    ========================================================================== */
