@@ -9,7 +9,7 @@
 <body>
     <header>
         <h1>Team Performance Dashboard</h1>
-        <p>Tracking mileage and personal records for <strong>Track Season</strong></p>
+        <p>Tracking mileage and personal records for <strong>Long-Distance Track Season</strong></p>
         <p id="last-updated" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
     </header>
 
@@ -88,10 +88,15 @@
                     </select>
                     <span class="select-arrow">▾</span>
                 </div>
+            
+                <!-- New: tabs -->
+                <div class="meet-tabs" id="meet-tabs" style="display: none; margin-top: 12px;">
+                    <button class="tab-btn active" data-tab="individual" onclick="switchMeetTab('individual')">Individual Events</button>
+                    <button class="tab-btn" data-tab="relay" onclick="switchMeetTab('relay')">Relay Events</button>
+                </div>
             </div>
             
-            <div id="meet-results-container">
-                </div>
+            <div id="meet-results-container"></div>
         </section>
         
     </main>

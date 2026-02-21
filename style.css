@@ -552,3 +552,52 @@ thead th {
         flex-direction: column;
     }
 }
+
+/* Meet result tabs */
+.meet-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 12px 0 18px;
+}
+
+.tab-btn {
+    padding: 10px 24px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 30px;
+    border: none;
+    cursor: pointer;
+    background: #f4e7df;
+    color: #8b4513;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.tab-btn:hover {
+    background: #ecd4c8;
+    transform: translateY(-1px);
+}
+
+.tab-btn.active {
+    background: #d2691e;
+    color: white;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+/* Make sure container doesn't jump when switching tabs */
+#meet-results-container {
+    min-height: 400px;   /* prevents big layout shift */
+}
+
+/* Better spacing for multi-relay cells */
+.relay-split-cell {
+    font-weight: 600;
+    color: #444;
+}
+
+.relay-event-cell {
+    font-size: 0.88rem;
+    color: #556;
+    padding-left: 12px !important;
+}

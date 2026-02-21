@@ -6,7 +6,8 @@ let currentWeekData = [];
 let originalWeekData = [];
 let allPRs = [];
 let prSortState = { column: null, ascending: true };
-let allRaceData = []; 
+let allRaceData = [];
+let currentMeetTab = "individual";
 
 // --- 1. INITIALIZATION ---
 
@@ -460,7 +461,7 @@ window.resetPRs = function() {
  * Fetches the Race Results tab.
  */
 async function fetchRaceResults() {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Race_Results!A2:H?key=${API_KEY}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Race_Results!A2:J?key=${API_KEY}`;
     try {
         const response = await fetch(url);
         const data = await response.json();
@@ -477,6 +478,8 @@ async function fetchRaceResults() {
         document.getElementById('meet-selector').value = lastMeet;
         displaySelectedMeet();
 
+        document.getElementById('meet-tabs').style.display = 'flex';
+
     } catch (error) { console.error("Race Results Error:", error); }
 }
 
@@ -491,101 +494,169 @@ function populateMeetSelector(rows) {
  * Checks for PRs and highlights them in green with a star.
  */
 window.displaySelectedMeet = function() {
-
     if (allPRs.length === 0) {
         setTimeout(displaySelectedMeet, 100);
         return;
     }
 
     const selectedMeet = document.getElementById('meet-selector').value;
+    if (!selectedMeet) {
+        document.getElementById('meet-results-container').innerHTML = "<p>Select a meet to view results.</p>";
+        return;
+    }
+
     const container = document.getElementById('meet-results-container');
     const meetRows = allRaceData.filter(row => row[1] === selectedMeet);
+
+    document.getElementById('meet-tabs').style.display = meetRows.length > 0 ? 'flex' : 'none';
+
+    let filteredRows;
+    let tableTitle;
+    let headers;
+
+    if (currentMeetTab === "relay") {
+        // Include rows that have AT LEAST one relay split
+        filteredRows = meetRows.filter(row => 
+            (row[6] && row[6].trim() !== '' && row[6] !== '-') ||
+            (row[8] && row[8].trim() !== '' && row[8] !== '-')
+        );
+        tableTitle = "Relay Performances";
+        headers = ["Athlete", "Team Time 1", "Event 1", "Team Time 2", "Event 2"];
+    } else {
+        filteredRows = meetRows.filter(row => 
+            (row[3] && row[3].trim() !== '' && row[3] !== '-') || 
+            (row[4] && row[4].trim() !== '' && row[4] !== '-') || 
+            (row[5] && row[5].trim() !== '' && row[5] !== '-')
+        );
+        tableTitle = "Individual Events";
+        headers = ["Athlete", "800m", "1600m", "3200m"];
+    }
 
     let totalPerformances = 0;
     let totalPRs = 0;
 
     let html = `<table>
         <thead>
-            <tr>
-                <th>Athlete</th>
-                <th>800m</th>
-                <th>1600m</th>
-                <th>3200m</th>
-                <th>Relay Split</th>
-                <th>Relay Event</th>
-            </tr>
-        </thead>
-        <tbody>`;
+            <tr>`;
 
-    meetRows.forEach(row => {
+    headers.forEach(h => {
+        html += `<th>${h}</th>`;
+    });
 
+    html += `</tr></thead><tbody>`;
+
+    filteredRows.forEach(row => {
         const athleteName = row[0] || "";
-
-        const athletePR = allPRs.find(p =>
+        const athletePR = allPRs.find(p => 
             (p[0] || "").trim().toLowerCase() === athleteName.trim().toLowerCase()
         ) || [];
 
-        const formatCell = (raceTime, prTime) => {
+        if (currentMeetTab === "relay") {
+            const teamTime1 = row[6] || '-';
+            const event1     = row[7] || '-';
+            const teamTime2  = row[8] || '-';
+            const event2     = row[9] || '-';
+        
+            // Skip if both team times are empty/invalid
+            if (teamTime1 === '-' && teamTime2 === '-') return;
+        
+            html += `
+                <tr>
+                    <td class="name-cell">${cleanName(athleteName)}</td>
+                    <td class="relay-split-cell" style="font-weight: bold; color: #c0392b;">${teamTime1}</td>
+                    <td class="relay-event-cell">${event1}</td>
+                    <td class="relay-split-cell" style="font-weight: bold; color: #c0392b;">${teamTime2}</td>
+                    <td class="relay-event-cell">${event2}</td>
+                </tr>`;
+        } else {
+            // Individual – same as before
+            const formatCell = (raceTime, prTime) => {
+                if (!raceTime || raceTime === '-' || raceTime === '0' || raceTime.trim() === '') {
+                    return '-';
+                }
+                totalPerformances++;
 
-            if (!raceTime || raceTime === '-' || raceTime === '0' || raceTime.trim() === '') {
-                return '-';
-            }
+                if (isNewPR(raceTime, prTime)) {
+                    totalPRs++;
+                    const delta = formatTimeDelta(prTime, raceTime);
+                    return `
+                        <span class="pr-highlight">
+                            ${raceTime}
+                            <span class="pr-star">⭐</span>
+                            <span class="pr-delta">${delta}</span>
+                        </span>`;
+                }
+                return raceTime;
+            };
 
-            totalPerformances++;
-
-            if (isNewPR(raceTime, prTime)) {
-                totalPRs++;
-
-                const deltaText = formatTimeDelta(prTime, raceTime);
-
-                return `
-                    <span class="pr-highlight">
-                        ${raceTime}
-                        <span class="pr-star">⭐</span>
-                        <span class="pr-delta">${deltaText}</span>
-                    </span>
-                `;
-            }
-
-            return raceTime;
-        };
-
-        html += `
-            <tr>
-                <td class="name-cell">${cleanName(athleteName)}</td>
-                <td>${formatCell(row[3], athletePR[1])}</td>
-                <td>${formatCell(row[4], athletePR[2])}</td>
-                <td>${formatCell(row[5], athletePR[3])}</td>
-                <td>${row[6] || '-'}</td>
-                <td style="font-size: 0.85rem; color: #778;">${row[7] || '-'}</td>
-            </tr>
-        `;
+            html += `
+                <tr>
+                    <td class="name-cell">${cleanName(athleteName)}</td>
+                    <td>${formatCell(row[3], athletePR[1])}</td>
+                    <td>${formatCell(row[4], athletePR[2])}</td>
+                    <td>${formatCell(row[5], athletePR[3])}</td>
+                </tr>`;
+        }
     });
 
     html += "</tbody></table>";
 
-    // Calculate PR %
-    let prRate = 0;
-    if (totalPerformances > 0) {
-        prRate = ((totalPRs / totalPerformances) * 100).toFixed(1);
-    }
+    // Summary
+    let summaryText;
+    if (currentMeetTab === "relay") {
+        let totalAthleteParticipations = 0;
+        const uniqueRelays = new Set();  // still keep unique team results
 
-    // Assuming you already have your meetRows filtered for the selected meet
-    let relayCount = meetRows.filter(row => row[6] && row[6].trim() !== '' && row[6] !== '-' && row[6] !== '0').length;
+        filteredRows.forEach(row => {
+            const time1 = (row[6] || '').trim();
+            const event1 = (row[7] || '').trim();
+            if (time1 !== '' && time1 !== '-' && time1 !== '0') {
+                totalAthleteParticipations++;
+                uniqueRelays.add(`${time1}||${event1}`);
+            }
+
+            const time2 = (row[8] || '').trim();
+            const event2 = (row[9] || '').trim();
+            if (time2 !== '' && time2 !== '-' && time2 !== '0') {
+                totalAthleteParticipations++;
+                uniqueRelays.add(`${time2}||${event2}`);
+            }
+        });
+
+        const uniqueCount = uniqueRelays.size;
+
+        summaryText = `
+            ${totalAthleteParticipations} relay athlete performances,
+            ${uniqueCount} unique relay team result${uniqueCount === 1 ? '' : 's'}
+        `;
+    } else {
+        let prRate = totalPerformances > 0 
+            ? ((totalPRs / totalPerformances) * 100).toFixed(1) 
+            : 0;
+        summaryText = `<strong>PR Rate:</strong> ${prRate}% (${totalPRs} PRs out of ${totalPerformances} races)`;
+    }
 
     const summaryHTML = `
         <div class="meet-summary">
-            <h3>${selectedMeet}</h3>
-            <p>
-                <strong>PR Rate:</strong> ${prRate}% 
-                (${totalPRs} PRs out of ${totalPerformances} individual races), (${relayCount} relay performances)
-            </p>
+            <h3>${selectedMeet} – ${tableTitle}</h3>
+            <p>${summaryText}</p>
         </div>
     `;
 
     container.innerHTML = summaryHTML + html;
 };
 
+window.switchMeetTab = function(tab) {
+    currentMeetTab = tab;
+
+    // Update active button style
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+
+    // Re-render current meet with new tab filter
+    displaySelectedMeet();
+};
 
 // --- 6. UTILITY HELPERS ---
 
