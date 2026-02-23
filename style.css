@@ -496,9 +496,9 @@ thead tr:hover {
 
 /* Maximum Heights for "Windows" */
 #mileage-container { max-height: 745px; }
-#pr-container { max-height: 800px; }
 #season-leaderboard-container { max-height: 565px; }
-#meet-results-container { max-height: 872px; }
+#pr-container { max-height: 800px; }
+#meet-results-container { max-height: 730px; }
 
 /* Sticky Main Table Header */
 thead th {
@@ -600,4 +600,124 @@ thead th {
     font-size: 0.88rem;
     color: #556;
     padding-left: 12px !important;
+}
+
+.meet-results-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+#meet-search {
+    width: 280px;
+    max-width: 100%;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    border: 2px solid #e6c2a6;
+    border-radius: 30px;
+    background: #fffaf5;
+    color: #8b4513;
+}
+
+#meet-search:focus {
+    outline: none;
+    border-color: chocolate;
+    box-shadow: 0 0 0 3px rgba(210,105,30,0.15);
+}
+
+.sort-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+.sort-controls button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    border-radius: 20px;
+}
+
+/* Make table headers sortable */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 24px !important; /* space for arrow */
+}
+
+th.sortable:hover {
+    background-color: #e67e22; /* darker chocolate hover */
+}
+
+/* Arrow inside header */
+th.sortable::after {
+    content: ' ⇅';
+    position: absolute;
+    right: 8px;
+    font-size: 0.85rem;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+th.sortable.active-asc::after {
+    content: ' ▲';
+    opacity: 1;
+    color: white;
+}
+
+th.sortable.active-desc::after {
+    content: ' ▼';
+    opacity: 1;
+    color: white;
+}
+
+/* Small reset button style if you add it */
+.small-reset {
+    padding: 6px 14px;
+    background: #777;
+    color: white;
+    border: none;
+    border-radius: 16px;
+}
+.small-reset:hover { background: #555; }
+
+/* Tighten spacing around the entire controls area */
+.meet-controls {
+    margin-bottom: 8px;          /* was probably ~20px or more */
+}
+
+/* Reduce gap between tabs and search/reset row */
+.meet-tabs {
+    margin-bottom: 6px !important;   /* was 12px + extra from flex */
+}
+
+/* Shrink vertical padding/margin in the search + reset container */
+.meet-results-controls {
+    margin: 6px 0 10px !important;   /* was 15px 0 20px */
+    gap: 6px;                        /* reduce flex gap if you use flex */
+}
+
+/* Make search input more compact */
+#meet-search {
+    padding: 8px 12px;           /* was 10px 14px — smaller */
+    margin-bottom: 4px;          /* tiny breathing room before reset button */
+}
+
+/* If you added a small reset button below search */
+.small-reset {
+    margin-top: 4px;             /* almost no extra space */
+    padding: 5px 12px;
+    font-size: 0.85rem;
+}
+
+/* Reduce space between summary card and table */
+.meet-summary {
+    margin-bottom: 10px !important;  /* was probably 15–20px */
+}
+
+/* Optional: less internal padding in summary card */
+.meet-summary {
+    padding: 10px 14px;          /* was 12px 18px */
 }

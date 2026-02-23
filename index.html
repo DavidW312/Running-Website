@@ -94,6 +94,12 @@
                     <button class="tab-btn active" data-tab="individual" onclick="switchMeetTab('individual')">Individual Events</button>
                     <button class="tab-btn" data-tab="relay" onclick="switchMeetTab('relay')">Relay Events</button>
                 </div>
+
+                <div class="meet-results-controls" id="meet-results-controls" style="display: none; margin: 15px 0 20px; text-align: center;">
+                    <input type="text" id="meet-search" placeholder="Search athlete..." onkeyup="filterMeetResults()">
+                    <button class="reset-btn small-reset" onclick="resetMeetSort()" style="margin-top: 8px; font-size: 0.9rem;">Reset Sort & Search</button>
+                </div>
+
             </div>
             
             <div id="meet-results-container"></div>

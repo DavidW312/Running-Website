@@ -8,6 +8,8 @@ let allPRs = [];
 let prSortState = { column: null, ascending: true };
 let allRaceData = [];
 let currentMeetTab = "individual";
+let meetSortState = { column: null, ascending: true };
+let originalMeetRows = [];  // we'll store the filtered rows before sorting/search
 
 // --- 1. INITIALIZATION ---
 
@@ -257,7 +259,7 @@ function renderMileageTable(rows) {
         return grpA.localeCompare(grpB);
     });
 
-    // Determine which weekday columns have any data (even A/XA/INJ)
+    // Determine which weekday columns have any data
     const weekdayCols = [2,3,4,5,6,7]; // Mon→Sat
     const activeWeekdays = {};
     weekdayCols.forEach(colIdx => {
@@ -278,9 +280,12 @@ function renderMileageTable(rows) {
     let currentSection = "";
 
     sortedRows.forEach(row => {
-        if (!row[0] && !row[1]) return;
+        if (!Array.isArray(row) || row.length < 2) return; // safety
 
-        const gender = getGender(buildName(row));
+        const name = buildName(row);
+        if (!name) return;
+
+        const gender = getGender(name);
         const group = row[9] || "Unassigned";
         const sectionHeader = `Group ${group} ${gender}`;
 
@@ -295,18 +300,18 @@ function renderMileageTable(rows) {
         const totalMiles = getMileageValue(row[8]); // column I
 
         htmlContent += `<tr>
-            <td class="name-cell">${cleanName(buildName(row))}</td>`;
+            <td class="name-cell">${cleanName(name)}</td>`;
 
-        // Weekday columns
+        // Weekday columns – safe handling
         weekdayCols.forEach(colIdx => {
-            let val = row[colIdx];
+            let val = (row[colIdx] != null) ? String(row[colIdx]).trim() : '';
 
-            // If the column has any entry and this cell is empty, mark as P
-            if ((!val || val === "") && activeWeekdays[colIdx]) {
+            if (val === "" && activeWeekdays[colIdx]) {
                 val = "P";
             }
 
-            htmlContent += `<td class="${getStatusClass(val)}">${val}</td>`;
+            const cellClass = getStatusClass(val);
+            htmlContent += `<td class="${cellClass}">${val}</td>`;
         });
 
         htmlContent += `<td class="total-cell">${totalMiles.toFixed(1)}</td></tr>`;
@@ -508,6 +513,15 @@ window.displaySelectedMeet = function() {
     const container = document.getElementById('meet-results-container');
     const meetRows = allRaceData.filter(row => row[1] === selectedMeet);
 
+    // Show/hide controls only when there's data
+    document.getElementById('meet-results-controls').style.display = 
+    (meetRows.length > 0 && selectedMeet) ? 'flex' : 'none';
+
+    document.getElementById('meet-search').value = '';
+
+    // Store clean copy for reset/sort
+    originalMeetRows = meetRows.map(row => [...row]);  // deep copy per row
+
     document.getElementById('meet-tabs').style.display = meetRows.length > 0 ? 'flex' : 'none';
 
     let filteredRows;
@@ -539,8 +553,8 @@ window.displaySelectedMeet = function() {
         <thead>
             <tr>`;
 
-    headers.forEach(h => {
-        html += `<th>${h}</th>`;
+    headers.forEach((h, index) => {
+        html += `<th class="sortable" data-index="${index}" onclick="sortMeetResults(${index})">${h}</th>`;
     });
 
     html += `</tr></thead><tbody>`;
@@ -643,7 +657,111 @@ window.displaySelectedMeet = function() {
         </div>
     `;
 
+    // After rendering, apply current sort state to headers
+    setTimeout(() => {
+        if (meetSortState.column !== null) {
+            updateHeaderArrows(meetSortState.column);
+        }
+    }, 0);
+
     container.innerHTML = summaryHTML + html;
+};
+
+// Filter meet results table by athlete name search
+window.filterMeetResults = function() {
+    const searchTerm = document.getElementById('meet-search').value.toLowerCase().trim();
+    const container = document.getElementById('meet-results-container');
+    const table = container.querySelector('table');
+    if (!table) return;
+
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const nameCell = row.querySelector('.name-cell');
+        if (!nameCell) return;
+        const name = nameCell.textContent.toLowerCase();
+        row.style.display = name.includes(searchTerm) ? '' : 'none';
+    });
+};
+
+// Sort the displayed meet results (only sorts visible rows / current tab)
+window.sortMeetResults = function(columnIndex) {
+    const container = document.getElementById('meet-results-container');
+    const table = container.querySelector('table');
+    if (!table) return;
+
+    // Toggle or set new column
+    if (meetSortState.column === columnIndex) {
+        meetSortState.ascending = !meetSortState.ascending;
+    } else {
+        meetSortState.column = columnIndex;
+        meetSortState.ascending = (columnIndex === 0) ? true : true; // name: A→Z, times: fastest first
+    }
+
+    const tbody = table.querySelector('tbody');
+    const rowsArray = Array.from(tbody.querySelectorAll('tr'));
+
+    rowsArray.sort((a, b) => {
+        let valA = getSortValue(a, columnIndex);
+        let valB = getSortValue(b, columnIndex);
+
+        if (valA === valB) return 0;
+        if (valA === '-' || valA === '') return 1;
+        if (valB === '-' || valB === '') return -1;
+
+        if (columnIndex === 0) { // Name - alphabetical
+            return meetSortState.ascending 
+                ? valA.localeCompare(valB) 
+                : valB.localeCompare(valA);
+        } else { // Time columns - numeric, smaller = better
+            return meetSortState.ascending 
+                ? valA - valB 
+                : valB - valA;
+        }
+    });
+
+    // Re-attach sorted rows
+    rowsArray.forEach(row => tbody.appendChild(row));
+
+    // Update header arrows (visual feedback)
+    updateHeaderArrows(columnIndex);
+};
+
+// Helper: extract sortable value from row
+function getSortValue(row, colIndex) {
+    const cells = row.querySelectorAll('td');
+    if (cells.length <= colIndex) return '';
+
+    let text = cells[colIndex].textContent.trim();
+
+    // Strip PR highlights / stars / deltas
+    text = text.replace(/⭐|\(-?\d+\.\d+s\)/g, '').trim();
+
+    // For time columns → convert to seconds
+    if (colIndex >= 1) {
+        return timeToSeconds(text) || 999999;  // bad times at bottom
+    }
+    return text;
+}
+
+function updateHeaderArrows(activeColumn) {
+    const headers = document.querySelectorAll('#meet-results-container th.sortable');
+    headers.forEach((th, index) => {
+        th.classList.remove('active-asc', 'active-desc');
+        if (index === activeColumn) {
+            if (meetSortState.ascending) {
+                th.classList.add('active-asc');
+            } else {
+                th.classList.add('active-desc');
+            }
+        }
+    });
+}
+
+// Reset sort + search
+window.resetMeetSort = function() {
+    meetSortState = { column: null, ascending: true };
+    document.getElementById('meet-search').value = '';
+    displaySelectedMeet();  // re-renders + clears arrows
 };
 
 window.switchMeetTab = function(tab) {
