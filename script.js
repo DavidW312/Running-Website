@@ -372,7 +372,7 @@ function isNewPR(raceTimeStr, prTimeStr) {
  * Fetches the PR tab.
  */
 async function fetchPRs() {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/PRs!A1:D?key=${API_KEY}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/PRs!A1:E?key=${API_KEY}`;
     try {
         const response = await fetch(url);
         const data = await response.json();
@@ -406,6 +406,7 @@ function renderPRTable(rows) {
                         <th>800m <button class="mini-sort" onclick="sortPRs(1)">${getArrow(1)}</button></th>
                         <th>1600m <button class="mini-sort" onclick="sortPRs(2)">${getArrow(2)}</button></th>
                         <th>3200m <button class="mini-sort" onclick="sortPRs(3)">${getArrow(3)}</button></th>
+                        <th>1 Mile <button class="mini-sort" onclick="sortPRs(4)">${getArrow(4)}</button></th>
                     </tr>
                 </thead>
                 <tbody>`;
@@ -417,6 +418,7 @@ function renderPRTable(rows) {
                 <td>${row[1] || '--'}</td>
                 <td>${row[2] || '--'}</td>
                 <td>${row[3] || '--'}</td>
+                <td>${row[4] || '--'}</td>
             </tr>`;
         }
     });
@@ -466,7 +468,7 @@ window.resetPRs = function() {
  * Fetches the Race Results tab.
  */
 async function fetchRaceResults() {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Race_Results!A2:J?key=${API_KEY}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Race_Results!A2:K?key=${API_KEY}`;
     try {
         const response = await fetch(url);
         const data = await response.json();
@@ -531,8 +533,8 @@ window.displaySelectedMeet = function() {
     if (currentMeetTab === "relay") {
         // Include rows that have AT LEAST one relay split
         filteredRows = meetRows.filter(row => 
-            (row[6] && row[6].trim() !== '' && row[6] !== '-') ||
-            (row[8] && row[8].trim() !== '' && row[8] !== '-')
+            (row[7] && row[7].trim() !== '' && row[6] !== '-') ||
+            (row[9] && row[9].trim() !== '' && row[8] !== '-')
         );
         tableTitle = "Relay Performances";
         headers = ["Athlete", "Team Time 1", "Event 1", "Team Time 2", "Event 2"];
@@ -540,10 +542,11 @@ window.displaySelectedMeet = function() {
         filteredRows = meetRows.filter(row => 
             (row[3] && row[3].trim() !== '' && row[3] !== '-') || 
             (row[4] && row[4].trim() !== '' && row[4] !== '-') || 
-            (row[5] && row[5].trim() !== '' && row[5] !== '-')
+            (row[5] && row[5].trim() !== '' && row[5] !== '-') || 
+            (row[6] && row[6].trim() !== '' && row[6] !== '-')
         );
         tableTitle = "Individual Events";
-        headers = ["Athlete", "800m", "1600m", "3200m"];
+        headers = ["Athlete", "800m", "1600m", "3200m", "1 Mile"];
     }
 
     let totalPerformances = 0;
@@ -566,10 +569,10 @@ window.displaySelectedMeet = function() {
         ) || [];
 
         if (currentMeetTab === "relay") {
-            const teamTime1 = row[6] || '-';
-            const event1     = row[7] || '-';
-            const teamTime2  = row[8] || '-';
-            const event2     = row[9] || '-';
+            const teamTime1 = row[7] || '-';
+            const event1     = row[8] || '-';
+            const teamTime2  = row[9] || '-';
+            const event2     = row[10] || '-';
         
             // Skip if both team times are empty/invalid
             if (teamTime1 === '-' && teamTime2 === '-') return;
@@ -609,6 +612,7 @@ window.displaySelectedMeet = function() {
                     <td>${formatCell(row[3], athletePR[1])}</td>
                     <td>${formatCell(row[4], athletePR[2])}</td>
                     <td>${formatCell(row[5], athletePR[3])}</td>
+                    <td>${formatCell(row[6], athletePR[4])}</td>
                 </tr>`;
         }
     });
@@ -622,15 +626,15 @@ window.displaySelectedMeet = function() {
         const uniqueRelays = new Set();  // still keep unique team results
 
         filteredRows.forEach(row => {
-            const time1 = (row[6] || '').trim();
-            const event1 = (row[7] || '').trim();
+            const time1 = (row[7] || '').trim();
+            const event1 = (row[8] || '').trim();
             if (time1 !== '' && time1 !== '-' && time1 !== '0') {
                 totalAthleteParticipations++;
                 uniqueRelays.add(`${time1}||${event1}`);
             }
 
-            const time2 = (row[8] || '').trim();
-            const event2 = (row[9] || '').trim();
+            const time2 = (row[9] || '').trim();
+            const event2 = (row[10] || '').trim();
             if (time2 !== '' && time2 !== '-' && time2 !== '0') {
                 totalAthleteParticipations++;
                 uniqueRelays.add(`${time2}||${event2}`);
