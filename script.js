@@ -1023,7 +1023,7 @@ function updateChartLogic(athleteRaces, colIndex) {
             scales: {
                 x: {
                     ticks: {
-                        maxRotation: 0, // Tilts the text if it gets too crowded
+                        maxRotation: 45, // Tilts the text if it gets too crowded
                         minRotation: 0,
                         autoSkip: true,
                         font: { size: 11 } // Slightly smaller for better fit
