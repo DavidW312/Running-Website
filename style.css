@@ -721,3 +721,14 @@ th.sortable.active-desc::after {
 .meet-summary {
     padding: 10px 14px;          /* was 12px 18px */
 }
+
+#progressionChart {
+    max-width: 100% !important;
+}
+
+/* On very small screens, make the chart a bit shorter */
+@media (max-height: 600px) {
+    #chart-container-inner {
+        height: 40vh !important;
+    }
+}

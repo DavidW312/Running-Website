@@ -10,6 +10,7 @@ let allRaceData = [];
 let currentMeetTab = "individual";
 let meetSortState = { column: null, ascending: true };
 let originalMeetRows = [];  // we'll store the filtered rows before sorting/search
+let myChart = null; // Global variable to store the chart instance
 
 // --- 1. INITIALIZATION ---
 
@@ -414,7 +415,11 @@ function renderPRTable(rows) {
     dataRows.forEach(row => {
         if (row[0]) {
             html += `<tr>
-                <td class="name-cell">${cleanName(row[0])}</td>
+                <td class="name-cell" 
+                    style="cursor:pointer; color:chocolate; text-decoration:underline;" 
+                    onclick="showAthleteChart('${row[0].replace(/'/g, "\\'")}')">
+                    ${cleanName(row[0])}
+                </td>
                 <td>${row[1] || '--'}</td>
                 <td>${row[2] || '--'}</td>
                 <td>${row[3] || '--'}</td>
@@ -908,3 +913,138 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 
+function showAthleteChart(athleteName) {
+    // 1. Get the data for this person
+    const athleteRaces = allRaceData.filter(row => 
+        row[0] && row[0].trim().toLowerCase() === athleteName.trim().toLowerCase()
+    );
+
+    if (athleteRaces.length === 0) {
+        alert("No race data found for this athlete.");
+        return;
+    }
+
+    // 2. Setup the Modal and Dropdown
+    document.getElementById('chart-modal').style.display = 'block';
+    document.getElementById('chart-overlay').style.display = 'block';
+    document.getElementById('chart-title').textContent = cleanName(athleteName);
+
+    // Add a dropdown selector if it doesn't exist, or just reset it
+    // Add or find the event selector
+    let selector = document.getElementById('event-selector');
+    if (!selector) {
+        selector = document.createElement('select');
+        selector.id = 'event-selector';
+        // Styled to look like your other dropdowns
+        // Styled to be more compact
+        selector.style = "width: auto; min-width: 140px; padding: 8px 16px; border-radius: 20px; border: 2px solid #e6c2a6; background: #fffaf5; color: #8b4513; font-weight: bold; cursor: pointer; outline: none; margin: 0 auto 5px auto; display: block;";
+        
+        // Inject it specifically at the top of the content wrapper
+        const wrapper = document.getElementById('chart-content-wrapper');
+        wrapper.insertBefore(selector, wrapper.firstChild);
+    }
+
+    // Define the columns: 800m is Col 3, 1600m is Col 4, 3200m is Col 5
+    const eventOptions = [
+        { label: "800m", index: 3 },
+        { label: "1600m", index: 4 },
+        { label: "3200m", index: 5 }
+    ];
+
+    // Build dropdown and pick the first one that has data
+    selector.innerHTML = "";
+    let firstValidIndex = null;
+
+    eventOptions.forEach(opt => {
+        const hasData = athleteRaces.some(r => r[opt.index] && r[opt.index] !== '-' && r[opt.index] !== '0');
+        if (hasData) {
+            let el = document.createElement('option');
+            el.value = opt.index;
+            el.textContent = opt.label;
+            selector.appendChild(el);
+            if (firstValidIndex === null) firstValidIndex = opt.index;
+        }
+    });
+
+    // When the coach changes the dropdown, redraw the chart
+    selector.onchange = () => updateChartLogic(athleteRaces, parseInt(selector.value));
+
+    // 3. Draw the initial chart
+    if (firstValidIndex !== null) {
+        updateChartLogic(athleteRaces, firstValidIndex);
+    } else {
+        alert("This athlete has no individual race times recorded.");
+        closeChart();
+    }
+}
+
+function updateChartLogic(athleteRaces, colIndex) {
+    const plotData = athleteRaces
+        .filter(row => row[colIndex] && row[colIndex] !== '-' && row[colIndex] !== '' && row[colIndex] !== '0')
+        .map(row => ({
+            meet: row[1],
+            date: row[2] || "", // Assuming Date is in Column C (Index 2)
+            seconds: timeToSeconds(row[colIndex]),
+            displayTime: row[colIndex]
+        }));
+
+    const ctx = document.getElementById('progressionChart').getContext('2d');
+    if (myChart) myChart.destroy();
+
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: plotData.map(d => d.date ? `${d.meet} (${d.date})` : d.meet),
+            datasets: [{
+                data: plotData.map(d => d.seconds),
+                borderColor: 'chocolate',
+                backgroundColor: 'rgba(210, 105, 30, 0.2)',
+                borderWidth: 3,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                // THIS FIXES THE DOTS (Tooltips)
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ` Time: ${plotData[context.dataIndex].displayTime}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 0, // Tilts the text if it gets too crowded
+                        minRotation: 0,
+                        autoSkip: true,
+                        font: { size: 11 } // Slightly smaller for better fit
+                    },
+                },
+                y: {
+                    reverse: true,
+                    ticks: {
+                        callback: function(value) {
+                            let m = Math.floor(value / 60);
+                            let s = Math.floor(value % 60);
+                            return m + ":" + (s < 10 ? '0' : '') + s;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function closeChart() {
+    document.getElementById('chart-modal').style.display = 'none';
+    document.getElementById('chart-overlay').style.display = 'none';
+}
