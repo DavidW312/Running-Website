@@ -497,8 +497,8 @@ thead tr:hover {
 /* Maximum Heights for "Windows" */
 #mileage-container { max-height: 745px; }
 #season-leaderboard-container { max-height: 565px; }
-#pr-container { max-height: 800px; }
-#meet-results-container { max-height: 730px; }
+#pr-container { max-height: 850px; }
+#meet-results-container { max-height: 725px; }
 
 /* Sticky Main Table Header */
 thead th {

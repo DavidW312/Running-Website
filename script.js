@@ -948,7 +948,8 @@ function showAthleteChart(athleteName) {
     const eventOptions = [
         { label: "800m", index: 3 },
         { label: "1600m", index: 4 },
-        { label: "3200m", index: 5 }
+        { label: "3200m", index: 5 },
+        { label: "1 Mile", index: 6 }
     ];
 
     // Build dropdown and pick the first one that has data
