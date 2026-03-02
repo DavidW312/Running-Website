@@ -732,3 +732,146 @@ th.sortable.active-desc::after {
         height: 40vh !important;
     }
 }
+
+/* ==========================================
+   SPORT MODE TABS (Top Level)
+========================================== */
+
+.sport-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.sport-tab {
+    padding: 14px 32px;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 40px;
+    border: none;
+    cursor: pointer;
+
+    background: #f4e7df;
+    color: #8b4513;
+
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+
+.sport-tab:hover {
+    background: #ecd4c8;
+    transform: translateY(-1px);
+}
+
+.sport-tab.active {
+    background: chocolate;
+    color: white;
+    box-shadow: 0 5px 14px rgba(0,0,0,0.15);
+}
+
+/* ==========================================
+   THROWS GRID LAYOUT
+========================================== */
+
+.throws-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+/* Make it responsive like distance */
+@media (max-width: 1000px) {
+    .throws-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+#throws-pr-container {
+    max-height: 900px;
+    overflow-y: auto;
+}
+
+#throws-meet-results-container {
+    max-height: 667px;
+    overflow-y: auto;
+}
+
+.implement-info {
+    font-weight: normal;
+    font-size: 0.85rem;
+}
+
+/* === Throws Meet Select Dropdown === */
+/* Throws Meet Select Dropdown */
+.throws-meet-controls label {
+    font-weight: 600;
+    color: chocolate;
+    margin-bottom: 6px;
+}
+
+.throws-custom-select-wrapper {
+    position: relative;
+    width: 260px;
+}
+
+#throws-meet-selector {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 100%;
+    padding: 12px 40px 12px 15px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 30px;
+    border: 2px solid #e6c2a6;
+    background-color: #fffaf5;
+    color: #8b4513;
+    cursor: pointer;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+#throws-meet-selector:hover {
+    background-color: #f8eee8;
+    border-color: chocolate;
+}
+
+#throws-meet-selector:focus {
+    outline: none;
+    border-color: chocolate;
+    box-shadow: 0 0 0 3px rgba(210,105,30,0.2);
+}
+
+.throws-select-arrow {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 1rem;
+    color: chocolate;
+    transition: transform 0.25s ease;
+}
+
+.throws-custom-select-wrapper:hover .throws-select-arrow {
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Athlete Search Input */
+#throws-meet-search {
+    width: 280px;
+    max-width: 100%;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    border: 2px solid #e6c2a6;
+    border-radius: 30px;
+    background: #fffaf5;
+    color: #8b4513;
+}
+
+#throws-meet-search:focus {
+    outline: none;
+    border-color: chocolate;
+    box-shadow: 0 0 0 3px rgba(210,105,30,0.15);
+}

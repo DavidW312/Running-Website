@@ -8,9 +8,16 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="sport-tabs">
+        <button class="sport-tab active" data-sport="distance">Long Distance</button>
+        <button class="sport-tab" data-sport="throws">Throws</button>
+    </div>
+
+    
+    <div id="distance-wrapper">
     <header>
         <h1>Team Performance Dashboard</h1>
-        <p>Tracking mileage and personal records for <strong>Long-Distance Track Season</strong></p>
+        <p>Tracking mileage and personal records for <strong>Long Distance Track Season</strong></p>
         <p id="last-updated" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
     </header>
 
@@ -107,7 +114,57 @@
         </section>
         
     </main>
+    </div>
 
+    <div id="throws-wrapper" class="hidden-section">
+
+        <header>
+            <h1>Team Performance Dashboard</h1>
+            <p>Tracking mileage and personal records for <strong>Throws Track Season</strong></p>
+            <p id="last-updated2" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
+        </header>
+
+    <div class="throws-grid">
+
+        <!-- LEFT COLUMN -->
+        <section id="throws-pr-section">
+            <h2>Throws Personal Records</h2>
+            <div id="throws-pr-container">
+                <p>Loading Throws PRs...</p>
+            </div>
+        </section>
+
+        <!-- RIGHT COLUMN -->
+    <section id="throws-results-section">
+        <h2>Throws Meet Results</h2>
+
+        <div class="controls throws-meet-controls">
+
+            <!-- Meet Selector -->
+            <label for="throws-meet-selector">Select Meet</label>
+            <div class="throws-custom-select-wrapper">
+                <select id="throws-meet-selector" onchange="displaySelectedThrowsMeet()">
+                    <option value="">Loading meets...</option>
+                </select>
+                <span class="throws-select-arrow">▾</span>
+            </div>
+
+            <!-- Athlete Search + Reset -->
+            <div id="throws-meet-results-controls" class="meet-results-controls" style="display: none;">
+                <input type="text" id="throws-meet-search" placeholder="Search athlete..." onkeyup="filterThrowsMeetResults()">
+                <button class="reset-btn small-reset" onclick="resetThrowsMeetSort()">Reset Sort & Search</button>
+            </div>
+
+        </div>
+
+        <!-- Summary and Results Table -->
+        <div id="throws-meet-summary" class="meet-summary hidden-section"></div>
+        <div id="throws-meet-results-container"></div>
+    </section>
+
+        </div>
+
+    </div>
     
     <div id="chart-overlay" onclick="closeChart()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:999;"></div>
 
