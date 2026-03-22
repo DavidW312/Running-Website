@@ -1081,29 +1081,90 @@ function updateDistanceHeaderArrows(activeColumnIndex) {
     });
 }
 
-function showAthleteChart(athleteName) {
-    if (!athleteName) return;
-    const searchName = athleteName.trim().toLowerCase();
+const CHART_EVENT_CONFIGS = {
+    distance: [
+        { label: "800m", key: 'm800', index: 3, type: 'time' },
+        { label: "1600m", key: 'm1600', index: 4, type: 'time' },
+        { label: "3200m", key: 'm3200', index: 5, type: 'time' },
+        { label: "1 Mile", key: 'm1mile', index: 6, type: 'time' }
+    ],
+    sprints: [
+        { label: "100m", key: 'm100', index: 3, type: 'time' },
+        { label: "200m", key: 'm200', index: 4, type: 'time' },
+        { label: "400m", key: 'm400', index: 5, type: 'time' },
+        { label: "800m", key: 'm800', index: 6, type: 'time' },
+        { label: "100/110H", key: 'h110', index: 7, type: 'time' },
+        { label: "300H", key: 'h300', index: 8, type: 'time' },
+        { label: "4x100", key: 'r4x100', index: 9, type: 'time' },
+        { label: "4x400", key: 'r4x400', index: 10, type: 'time' },
+        { label: "4x200", key: 'r4x200', index: 11, type: 'time' }
+    ],
+    throws: [
+        { label: "Shot Put", key: 'shot', type: 'distance', getVal: r => r.shot12 || r.shot4 || '' },
+        { label: "Discus", key: 'disc', type: 'distance', getVal: r => r.disc16 || r.disc1 || '' }
+    ],
+    jumps: [
+        { label: "Long Jump", key: 'long', type: 'distance', getVal: r => r.long },
+        { label: "Triple Jump", key: 'triple', type: 'distance', getVal: r => r.triple },
+        { label: "High Jump", key: 'high', type: 'distance', getVal: r => r.high },
+        { label: "Pole Vault", key: 'pole', type: 'distance', getVal: r => r.pole }
+    ]
+};
 
-    // 1. Pick the correct data source
-    const resultsSource = (typeof distanceMeetData !== 'undefined' && distanceMeetData.length > 0) ? distanceMeetData : allRaceData;
-    
-    const athleteRaces = resultsSource.filter(row => {
-        const nameInRow = Array.isArray(row) ? row[0] : row.name;
-        return nameInRow && nameInRow.trim().toLowerCase() === searchName;
+/** Normalize name for matching: trim, lowercase, strip (F)/(M) and similar suffixes. */
+function normalizeNameForMatch(name) {
+    if (!name) return '';
+    return name.trim().toLowerCase()
+        .replace(/\s*\([FfMmGgBb]\)\s*$/, '')
+        .replace(/\s*\([Ff]emale\)\s*$/i, '')
+        .replace(/\s*\([Mm]ale\)\s*$/i, '')
+        .trim();
+}
+
+function getAthleteMeetData(athleteName, sport) {
+    const searchNorm = normalizeNameForMatch(athleteName);
+    if (!searchNorm) return [];
+
+    let source = [];
+    if (sport === 'distance') {
+        source = (typeof distanceMeetData !== 'undefined' && distanceMeetData.length > 0) ? distanceMeetData : (typeof allRaceData !== 'undefined' ? allRaceData : []);
+    } else if (sport === 'sprints') {
+        source = typeof sprintsMeetData !== 'undefined' ? sprintsMeetData : [];
+    } else if (sport === 'throws') {
+        source = typeof throwsMeetData !== 'undefined' ? throwsMeetData : [];
+    } else if (sport === 'jumps') {
+        source = typeof jumpsMeetData !== 'undefined' ? jumpsMeetData : [];
+    }
+    return source.filter(row => {
+        const nameInRow = Array.isArray(row) ? row[0] : (row.name || '');
+        return nameInRow && normalizeNameForMatch(nameInRow) === searchNorm;
     });
+}
 
+function formatInchesAsFeetInches(inches) {
+    if (inches <= 0) return "--";
+    const feet = Math.floor(inches / 12);
+    const rem = (inches % 12).toFixed(1).replace(/\.0$/, '');
+    return rem ? `${feet}' ${rem}"` : `${feet}'`;
+}
+
+function showAthleteChart(athleteName, sport) {
+    if (!athleteName) return;
+    sport = sport || 'distance';
+
+    const athleteRaces = getAthleteMeetData(athleteName, sport);
     if (athleteRaces.length === 0) {
-        alert("No race data found for this athlete.");
+        alert(`No meet data found for this athlete. Make sure ${sport} meet results are loaded.`);
         return;
     }
 
-    // 2. Show Modal
+    const configs = CHART_EVENT_CONFIGS[sport];
+    if (!configs) return;
+
     document.getElementById('chart-modal').style.display = 'block';
     document.getElementById('chart-overlay').style.display = 'block';
     document.getElementById('chart-title').textContent = cleanName(athleteName);
 
-    // 3. Build Dropdown
     let selector = document.getElementById('event-selector');
     if (!selector) {
         selector = document.createElement('select');
@@ -1112,88 +1173,127 @@ function showAthleteChart(athleteName) {
         document.getElementById('chart-content-wrapper').prepend(selector);
     }
 
-    // Explicit mapping for both Arrays and Objects
-    const eventOptions = [
-        { label: "800m", key: 'm800', index: 3 },
-        { label: "1600m", key: 'm1600', index: 4 },
-        { label: "3200m", key: 'm3200', index: 5 },
-        { label: "1 Mile", key: 'm1mile', index: 6 }
-    ];
-
     selector.innerHTML = "";
     let firstValidKey = null;
 
-    eventOptions.forEach(opt => {
-        const hasData = athleteRaces.some(r => {
-            const val = Array.isArray(r) ? r[opt.index] : r[opt.key];
-            return val && val !== '-' && val !== '0' && val !== '';
-        });
-        
+    configs.forEach(opt => {
+        let hasData = false;
+        if (opt.getVal) {
+            hasData = athleteRaces.some(r => {
+                const val = opt.getVal(r);
+                return val && val !== '-' && val !== '0' && val !== '' && val !== '--';
+            });
+        } else {
+            hasData = athleteRaces.some(r => {
+                const val = Array.isArray(r) ? r[opt.index] : r[opt.key];
+                return val && val !== '-' && val !== '0' && val !== '';
+            });
+        }
         if (hasData) {
-            let el = document.createElement('option');
-            el.value = opt.key; // We will always pass the KEY to the update function
+            const el = document.createElement('option');
+            el.value = opt.key;
             el.textContent = opt.label;
+            el.dataset.type = opt.type;
             selector.appendChild(el);
             if (!firstValidKey) firstValidKey = opt.key;
         }
     });
 
     if (firstValidKey) {
-        selector.onchange = () => updateChartLogic(athleteRaces, selector.value);
-        // Timeout ensures the modal animation finishes so the chart has a width
-        setTimeout(() => updateChartLogic(athleteRaces, firstValidKey), 100);
+        const opt = configs.find(o => o.key === firstValidKey);
+        const chartType = opt ? opt.type : 'time';
+        selector.onchange = () => {
+            const sel = configs.find(o => o.key === selector.value);
+            updateChartLogic(athleteRaces, selector.value, sport, sel ? sel.type : 'time', configs);
+        };
+        setTimeout(() => updateChartLogic(athleteRaces, firstValidKey, sport, chartType, configs), 100);
     } else {
-        alert("No individual event times (800, 1600, 3200) found for this athlete.");
+        alert(`No event data found for this athlete in ${sport}.`);
         closeChart();
     }
 }
 
-function updateChartLogic(athleteRaces, activeKey) {
-    // This map ensures that if we are looking for 'm800', we check BOTH the property 'm800' 
-    // AND the index 3 (Column D) in case it's a raw array.
-    const keyToIndex = { 'm800': 3, 'm1600': 4, 'm3200': 5, 'm1mile': 6 };
-    const activeIndex = keyToIndex[activeKey];
+function parseMeetDate(dateStr) {
+    if (!dateStr) return new Date(0);
+    const str = String(dateStr).trim();
+    const parts = str.split('/');
+    if (parts.length === 3) {
+        let m = parseInt(parts[0], 10);
+        let d = parseInt(parts[1], 10);
+        let y = parseInt(parts[2], 10);
+        if (y < 100) y += 2000;
+        return new Date(y, m - 1, d);
+    }
+    return new Date(str);
+}
 
-    const plotData = athleteRaces.map(row => {
-        let timeStr = "";
-        let meetName = Array.isArray(row) ? row[1] : row.meet;
-        let meetDate = Array.isArray(row) ? row[2] : row.date;
+function updateChartLogic(athleteRaces, activeKey, sport, chartType, configs) {
+    const opt = (configs || CHART_EVENT_CONFIGS[sport || 'distance']).find(o => o.key === activeKey);
+    const isTime = (chartType || (opt && opt.type) || 'time') === 'time';
 
-        if (Array.isArray(row)) {
-            timeStr = row[activeIndex] || "";
-        } else {
-            timeStr = row[activeKey] || "";
-        }
+    let plotData;
+    if (isTime) {
+        const keyToIndex = { m800: 3, m1600: 4, m3200: 5, m1mile: 6, m100: 3, m200: 4, m400: 5, h110: 7, h300: 8, r4x100: 9, r4x400: 10, r4x200: 11 };
+        const idx = keyToIndex[activeKey];
+        plotData = athleteRaces.map(row => {
+            const meetName = Array.isArray(row) ? row[1] : row.meet;
+            const meetDate = Array.isArray(row) ? row[2] : row.date;
+            const timeStr = Array.isArray(row) ? (row[idx] || "") : (row[activeKey] || "");
+            return {
+                meet: meetName || "Unknown Meet",
+                date: meetDate || "",
+                value: timeToSeconds(timeStr),
+                displayVal: timeStr
+            };
+        }).filter(d => d.displayVal && d.displayVal !== '-' && d.displayVal !== '0' && d.value > 0 && d.value < 999999);
+    } else {
+        const getVal = opt && opt.getVal ? opt.getVal : (r) => r[activeKey];
+        plotData = athleteRaces.map(row => {
+            const meetName = row.meet;
+            const meetDate = row.date || "";
+            const markStr = getVal(row) || "";
+            const inches = parseThrowDistance(markStr);
+            return {
+                meet: meetName || "Unknown Meet",
+                date: meetDate,
+                value: inches,
+                displayVal: markStr
+            };
+        }).filter(d => d.displayVal && d.displayVal !== '-' && d.displayVal !== '0' && d.value > 0);
+    }
 
-        return {
-            meet: meetName || "Unknown Meet",
-            date: meetDate || "",
-            seconds: timeToSeconds(timeStr),
-            displayTime: timeStr
-        };
-    })
-    // CRITICAL: Filter out rows that don't have a valid time for THIS specific event
-    .filter(d => d.displayTime && d.displayTime !== '-' && d.displayTime !== '0' && d.seconds > 0);
-
-    // Sort by date (Oldest to Newest)
-    plotData.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateA - dateB;
-    });
+    plotData.sort((a, b) => parseMeetDate(a.date) - parseMeetDate(b.date));
 
     const canvas = document.getElementById('progressionChart');
     const ctx = canvas.getContext('2d');
+    if (window.myChart instanceof Chart) window.myChart.destroy();
 
-    if (window.myChart instanceof Chart) {
-        window.myChart.destroy();
-    }
-
-    // If still no points after filtering, log it so we can see why
     if (plotData.length === 0) {
-        console.warn("Chart Error: No valid data points after filtering for key:", activeKey);
+        console.warn("Chart Error: No valid data points for key:", activeKey);
         return;
     }
+
+    const yAxisConfig = isTime
+        ? {
+            reverse: true,
+            ticks: {
+                callback: (v) => {
+                    const m = Math.floor(v / 60);
+                    const s = v % 60;
+                    if (m > 0) {
+                        const sec = Math.floor(s);
+                        return `${m}:${sec < 10 ? '0' : ''}${sec}`;
+                    }
+                    return s === Math.floor(s) ? String(Math.floor(s)) : s.toFixed(1);
+                }
+            }
+        }
+        : {
+            reverse: false,
+            ticks: {
+                callback: (v) => formatInchesAsFeetInches(v)
+            }
+        };
 
     window.myChart = new Chart(ctx, {
         type: 'line',
@@ -1201,7 +1301,7 @@ function updateChartLogic(athleteRaces, activeKey) {
             labels: plotData.map(d => d.date ? `${d.meet} (${d.date})` : d.meet),
             datasets: [{
                 label: activeKey,
-                data: plotData.map(d => d.seconds),
+                data: plotData.map(d => d.value),
                 borderColor: 'chocolate',
                 backgroundColor: 'rgba(210, 105, 30, 0.2)',
                 borderWidth: 3,
@@ -1215,23 +1315,12 @@ function updateChartLogic(athleteRaces, activeKey) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: {
-                    reverse: true, // Lower time = Higher point
-                    ticks: {
-                        callback: (value) => {
-                            let m = Math.floor(value / 60);
-                            let s = Math.floor(value % 60);
-                            return `${m}:${s < 10 ? '0' : ''}${s}`;
-                        }
-                    }
-                }
-            },
+            scales: { y: yAxisConfig },
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (ctx) => ` Time: ${plotData[ctx.dataIndex].displayTime}`
+                        label: (ctx) => (isTime ? `Time: ` : `Mark: `) + plotData[ctx.dataIndex].displayVal
                     }
                 }
             }
@@ -1415,9 +1504,10 @@ function renderThrowsPRTable() {
         `;
 
         boys.forEach(athlete => {
+            const nameEsc = (athlete.name || '').replace(/'/g, "\\'");
             html += `
                 <tr>
-                    <td class="name-cell">${athlete.name}</td>
+                    <td class="name-cell" style="cursor:pointer; color:chocolate; text-decoration:underline;" onclick="showAthleteChart('${nameEsc}', 'throws')">${athlete.name}</td>
                     <td>${athlete.shot}</td>
                     <td>${athlete.disc}</td>
                 </tr>
@@ -1439,9 +1529,10 @@ function renderThrowsPRTable() {
         `;
 
         girls.forEach(athlete => {
+            const nameEsc = (athlete.name || '').replace(/'/g, "\\'");
             html += `
                 <tr>
-                    <td class="name-cell">${athlete.name}</td>
+                    <td class="name-cell" style="cursor:pointer; color:chocolate; text-decoration:underline;" onclick="showAthleteChart('${nameEsc}', 'throws')">${athlete.name}</td>
                     <td>${athlete.shot}</td>
                     <td>${athlete.disc}</td>
                 </tr>
@@ -1940,9 +2031,10 @@ function renderSprintsPRTable(rows) {
         const h110 = row.hurdles110 || '--';
         const h300 = row.hurdles300 || '--';
 
+        const nameEsc = (row.name || '').replace(/'/g, "\\'");
         html += `
         <tr>
-        <td class="name-cell">${name}</td>
+        <td class="name-cell" style="cursor:pointer; color:chocolate; text-decoration:underline;" onclick="showAthleteChart('${nameEsc}', 'sprints')">${name}</td>
         <td>${m100}</td>
         <td>${m200}</td>
         <td>${m400}</td>
@@ -2358,9 +2450,10 @@ function renderJumpsPRTable() {
     `;
 
     rows.forEach(athlete => {
+        const nameEsc = (athlete.name || '').replace(/'/g, "\\'");
         html += `
             <tr>
-                <td class="name-cell">${cleanName(athlete.name)}</td>
+                <td class="name-cell" style="cursor:pointer; color:chocolate; text-decoration:underline;" onclick="showAthleteChart('${nameEsc}', 'jumps')">${cleanName(athlete.name)}</td>
                 <td>${athlete.long}</td>
                 <td>${athlete.triple}</td>
                 <td>${athlete.high}</td>
@@ -2774,9 +2867,10 @@ function renderSprintsRelayTable(rowsToRender) {
     rows.forEach(row => {
         if (!row.name) return;
 
+        const nameEsc = (row.name || '').replace(/'/g, "\\'");
         html += `
         <tr>
-            <td class="name-cell">${cleanName(row.name)}</td>
+            <td class="name-cell" style="cursor:pointer; color:chocolate; text-decoration:underline;" onclick="showAthleteChart('${nameEsc}', 'sprints')">${cleanName(row.name)}</td>
             <td>${row.relay4x100 || '--'}</td>
             <td>${row.relay4x400 || '--'}</td>
             <td>${row.relay4x200 || '--'}</td>
