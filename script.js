@@ -17,6 +17,8 @@ let throwsMeetData = [];
 let currentThrowsMeet = null;
 let throwsMeetSortState = { column: null, ascending: true };
 let allThrowsPRs = []; // separate array for throws PRS
+let throwsPRSheetRows = [];
+let throwsPRSortState = { column: null, ascending: true };
 
 let originalThrowsRows = [];
 let originalSprintsRows = [];
@@ -26,11 +28,13 @@ let originalJumpsRows = [];
 let allDistancePRs = []; // Rename allPRs to this for clarity
 let distanceMeetData = []; // Rename allRaceData to this
 let distanceSortState = { column: null, ascending: true };
+let distancePRSortState = { column: null, ascending: true };
 
 // --- SPRINTS STATE ---
 let allSprintsPRs = [];
 let sprintsMeetData = [];
-let sprintsSortState = { column: null, ascending: true };
+let sprintsIndividualPRSortState = { column: null, ascending: true };
+let sprintsRelayPRSortState = { column: null, ascending: true };
 
 let sprintsMeetSortState = { column: null, ascending: true };
 let currentSprintsMeet = "";
@@ -529,15 +533,39 @@ async function fetchPRs() {
         const response = await fetch(url);
         const data = await response.json();
         if (data.values) {
-            // Store in the correct global variable
-            allDistancePRs = data.values; 
-            renderPRTable(allDistancePRs);
+            allDistancePRs = data.values;
+            renderPRTable(orderedDistancePRRows(allDistancePRs));
             return true;
         }
     } catch (e) { 
         console.error("PR Fetch Error:", e); 
         return false; 
     }
+}
+
+function orderedDistancePRRows(rows) {
+    let data = rows.filter(row => row[0] && row[0].trim().toLowerCase() !== "name");
+    if (distancePRSortState.column === null) return data;
+
+    const columnIndex = distancePRSortState.column;
+    const ascending = distancePRSortState.ascending;
+    data = [...data];
+    data.sort((a, b) => {
+        if (columnIndex === 0) {
+            const nameA = (a[0] || "").toLowerCase();
+            const nameB = (b[0] || "").toLowerCase();
+            return ascending ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        }
+        const emptyA = isMissingTrackTime(a[columnIndex]);
+        const emptyB = isMissingTrackTime(b[columnIndex]);
+        if (emptyA && emptyB) return 0;
+        if (emptyA) return 1;
+        if (emptyB) return -1;
+        const timeA = timeToSeconds(a[columnIndex]);
+        const timeB = timeToSeconds(b[columnIndex]);
+        return ascending ? timeA - timeB : timeB - timeA;
+    });
+    return data;
 }
 
 /**
@@ -598,12 +626,9 @@ function renderPRTable(rowsToRender) {
  * Re-sorts the global allDistancePRs and triggers a re-render.
  */
 window.sortPRs = function(columnIndex) {
-    // 1. Get current data (minus header)
-    let dataOnly = allDistancePRs.filter(row => row[0] && row[0].trim().toLowerCase() !== "name");
-
+    const dataOnly = allDistancePRs.filter(row => row[0] && row[0].trim().toLowerCase() !== "name");
     if (dataOnly.length === 0) return;
 
-    // 2. Toggle direction
     if (distancePRSortState.column === columnIndex) {
         distancePRSortState.ascending = !distancePRSortState.ascending;
     } else {
@@ -611,26 +636,7 @@ window.sortPRs = function(columnIndex) {
         distancePRSortState.ascending = true;
     }
 
-    // 3. Perform Sort
-    dataOnly.sort((a, b) => {
-        if (columnIndex === 0) {
-            const nameA = (a[0] || "").toLowerCase();
-            const nameB = (b[0] || "").toLowerCase();
-            return distancePRSortState.ascending ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-        } else {
-            const timeA = timeToSeconds(a[columnIndex]);
-            const timeB = timeToSeconds(b[columnIndex]);
-            
-            // Push empty values to bottom
-            if (timeA === 0) return 1;
-            if (timeB === 0) return -1;
-            
-            return distancePRSortState.ascending ? timeA - timeB : timeB - timeA;
-        }
-    });
-
-    // 4. Update Table
-    renderPRTable(dataOnly);
+    renderPRTable(orderedDistancePRRows(allDistancePRs));
 };
 
 /**
@@ -643,11 +649,11 @@ window.filterPRs = function() {
     
     const dataOnly = allDistancePRs.filter(row => row[0] && row[0].trim().toLowerCase() !== "name");
     
-    const filtered = dataOnly.filter(row => 
+    const filtered = dataOnly.filter(row =>
         row[0] && row[0].toLowerCase().includes(searchTerm)
     );
-    
-    renderPRTable(filtered);
+
+    renderPRTable(orderedDistancePRRows(filtered));
 };
 
 // allSprintsPRs = [{name, m100, m200, ...}, {...}, ...]
@@ -670,11 +676,6 @@ window.filterSprintsPRs = function() {
     });
 };
 
-function resetSprintsPRs() {
-    document.getElementById('sprints-pr-search').value = '';
-    renderSprintsPRTable(allSprintsPRs);
-}
-
 /**
  * 5. RESET PRS
  */
@@ -682,7 +683,7 @@ window.resetPRs = function() {
     const searchInput = document.getElementById('pr-search');
     if (searchInput) searchInput.value = "";
     distancePRSortState = { column: null, ascending: true };
-    renderPRTable(allDistancePRs);
+    renderPRTable(orderedDistancePRRows(allDistancePRs));
 };
 
 // --- 5. MEET RESULTS ENGINE ---
@@ -1036,6 +1037,12 @@ function timeToSeconds(timeStr) {
     return parseFloat(timeStr);
 }
 
+/** True if no usable time for sorting (empty / dash / unparsed). */
+function isMissingTrackTime(val) {
+    if (!val || val === '--' || val === '-' || String(val).trim() === '') return true;
+    return timeToSeconds(val) >= 999999;
+}
+
 function formatTimeDelta(oldTimeStr, newTimeStr) {
     const oldSec = timeToSeconds(oldTimeStr);
     const newSec = timeToSeconds(newTimeStr);
@@ -1246,9 +1253,16 @@ async function fetchThrowsPRs() {
 
         if (!data.values) {
             document.getElementById('throws-pr-container').innerHTML = "<p>No throws data found.</p>";
+            throwsPRSheetRows = [];
+            const throwsSearch = document.getElementById('throws-pr-search');
+            if (throwsSearch) throwsSearch.value = '';
             return;
         }
 
+        throwsPRSheetRows = data.values;
+        throwsPRSortState = { column: null, ascending: true };
+        const throwsSearchIn = document.getElementById('throws-pr-search');
+        if (throwsSearchIn) throwsSearchIn.value = '';
         allThrowsPRs = [];
 
         data.values.forEach(row => {
@@ -1273,7 +1287,7 @@ async function fetchThrowsPRs() {
             }
         });
 
-        renderThrowsPRTable(data.values);
+        renderThrowsPRTable();
         updateTimestamp2();
 
     } catch (error) {
@@ -1281,49 +1295,107 @@ async function fetchThrowsPRs() {
     }
 }
 
-function renderThrowsPRTable(rows) {
-
-    const container = document.getElementById("throws-pr-container");
-
+function partitionThrowsPRAthletes(rows) {
     const boys = [];
     const girls = [];
-
-    // 1️⃣ Separate boys and girls into different arrays
+    if (!rows || !rows.length) return { boys, girls };
     rows.forEach(row => {
-
         const boyName = cleanName(row[0]);
         const boyShot = row[1];
         const boyDisc = row[2];
-
         const girlName = cleanName(row[4]);
         const girlShot = row[5];
         const girlDisc = row[6];
-
         if (boyName && boyName.trim() !== "") {
-            boys.push({
-                name: boyName,
-                shot: boyShot || '--',
-                disc: boyDisc || '--'
-            });
+            boys.push({ name: boyName, shot: boyShot || '--', disc: boyDisc || '--' });
         }
-
         if (girlName && girlName.trim() !== "") {
-            girls.push({
-                name: girlName,
-                shot: girlShot || '--',
-                disc: girlDisc || '--'
-            });
+            girls.push({ name: girlName, shot: girlShot || '--', disc: girlDisc || '--' });
         }
     });
+    return { boys, girls };
+}
 
-    // 2️⃣ Start building table
+function getThrowsPRBoysGirlsForDisplay() {
+    let { boys, girls } = partitionThrowsPRAthletes(throwsPRSheetRows);
+    const input = document.getElementById('throws-pr-search');
+    const q = input ? input.value.toLowerCase().trim() : '';
+    if (q) {
+        boys = boys.filter(a => a.name.toLowerCase().includes(q));
+        girls = girls.filter(a => a.name.toLowerCase().includes(q));
+    }
+    if (throwsPRSortState.column !== null) {
+        boys = sortThrowsPRAthleteList(boys, throwsPRSortState.column, throwsPRSortState.ascending);
+        girls = sortThrowsPRAthleteList(girls, throwsPRSortState.column, throwsPRSortState.ascending);
+    }
+    return { boys, girls };
+}
+
+window.filterThrowsPRs = function () {
+    renderThrowsPRTable();
+};
+
+window.resetThrowsPRs = function () {
+    const input = document.getElementById('throws-pr-search');
+    if (input) input.value = '';
+    throwsPRSortState = { column: null, ascending: true };
+    renderThrowsPRTable();
+};
+
+function sortThrowsPRAthleteList(athletes, columnIndex, ascending) {
+    const list = [...athletes];
+    list.sort((a, b) => {
+        if (columnIndex === 0) {
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            return ascending ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        }
+        const rawA = columnIndex === 1 ? a.shot : a.disc;
+        const rawB = columnIndex === 1 ? b.shot : b.disc;
+        const emptyA = isEmptyFieldEventMark(rawA);
+        const emptyB = isEmptyFieldEventMark(rawB);
+        if (emptyA && emptyB) return 0;
+        if (emptyA) return 1;
+        if (emptyB) return -1;
+        const distA = parseThrowDistance(rawA);
+        const distB = parseThrowDistance(rawB);
+        return ascending ? distB - distA : distA - distB;
+    });
+    return list;
+}
+
+window.sortThrowsPRs = function (columnIndex) {
+    const { boys, girls } = partitionThrowsPRAthletes(throwsPRSheetRows);
+    if (boys.length + girls.length === 0) return;
+
+    if (throwsPRSortState.column === columnIndex) {
+        throwsPRSortState.ascending = !throwsPRSortState.ascending;
+    } else {
+        throwsPRSortState.column = columnIndex;
+        throwsPRSortState.ascending = true;
+    }
+
+    renderThrowsPRTable();
+};
+
+function renderThrowsPRTable() {
+    const container = document.getElementById("throws-pr-container");
+    if (!container) return;
+
+    let { boys, girls } = getThrowsPRBoysGirlsForDisplay();
+
+    const getArrow = (col) => {
+        if (throwsPRSortState.column !== col) return '⇅';
+        return throwsPRSortState.ascending ? '▲' : '▼';
+    };
+
     let html = `
         <table>
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Shot Put</th>
-                    <th>Discus</th>
+                    <th onclick="sortThrowsPRs(0)" style="cursor:pointer">Name ${getArrow(0)}</th>
+                    <th>Shot Put <button type="button" class="mini-sort" onclick="sortThrowsPRs(1)">${getArrow(1)}</button></th>
+                    <th>Discus <button type="button" class="mini-sort" onclick="sortThrowsPRs(2)">${getArrow(2)}</button></th>
                 </tr>
             </thead>
             <tbody>
@@ -1768,29 +1840,97 @@ function formatThrowDelta(prMark, meetMark) {
     return ` (+${feet}' ${inches}")`;
 }
 
+function getSprintsPRSortField(row, columnIndex, tableKind) {
+    if (tableKind === 'relay') {
+        const keys = ['name', 'relay4x100', 'relay4x400', 'relay4x200'];
+        return row[keys[columnIndex]];
+    }
+    const keys = ['name', 'm100', 'm200', 'm400', 'm800', 'hurdles110', 'hurdles300'];
+    return row[keys[columnIndex]];
+}
 
+function orderedSprintsPRRows(tableKind) {
+    const state = tableKind === 'relay' ? sprintsRelayPRSortState : sprintsIndividualPRSortState;
+    let data = allSprintsPRs.filter(row => row.name && String(row.name).trim());
+    if (state.column === null) return data;
+
+    const columnIndex = state.column;
+    const ascending = state.ascending;
+
+    data.sort((a, b) => {
+        const rawA = getSprintsPRSortField(a, columnIndex, tableKind);
+        const rawB = getSprintsPRSortField(b, columnIndex, tableKind);
+
+        if (columnIndex === 0) {
+            const nameA = (rawA || '').toLowerCase();
+            const nameB = (rawB || '').toLowerCase();
+            return ascending ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        }
+
+        const emptyA = isMissingTrackTime(rawA);
+        const emptyB = isMissingTrackTime(rawB);
+        if (emptyA && emptyB) return 0;
+        if (emptyA) return 1;
+        if (emptyB) return -1;
+
+        const timeA = timeToSeconds(rawA);
+        const timeB = timeToSeconds(rawB);
+        return ascending ? timeA - timeB : timeB - timeA;
+    });
+
+    return data;
+}
+
+window.sortSprintsPRs = function (columnIndex, tableKind) {
+    const state = tableKind === 'relay' ? sprintsRelayPRSortState : sprintsIndividualPRSortState;
+    const base = allSprintsPRs.filter(row => row.name && String(row.name).trim());
+    if (base.length === 0) return;
+
+    if (state.column === columnIndex) {
+        state.ascending = !state.ascending;
+    } else {
+        state.column = columnIndex;
+        state.ascending = true;
+    }
+
+    const data = orderedSprintsPRRows(tableKind);
+    if (tableKind === 'relay') {
+        renderSprintsRelayTable(data);
+    } else {
+        renderSprintsPRTable(data);
+    }
+
+    const q = document.getElementById('sprints-pr-search')?.value?.trim();
+    if (q) filterSprintsPRs();
+};
 
 function renderSprintsPRTable(rows) {
     const container = document.getElementById("sprints-pr-container");
+    if (!container) return;
+
+    const getArrow = (col) => {
+        if (sprintsIndividualPRSortState.column !== col) return '⇅';
+        return sprintsIndividualPRSortState.ascending ? '▲' : '▼';
+    };
 
     let html = `
     <table>
     <thead>
     <tr>
-    <th>Name</th>
-    <th>100m</th>
-    <th>200m</th>
-    <th>400m</th>
-    <th>800m</th>
-    <th>100/110H</th>
-    <th>300H</th>
+    <th onclick="sortSprintsPRs(0, 'individual')" style="cursor:pointer">Name ${getArrow(0)}</th>
+    <th>100m <button type="button" class="mini-sort" onclick="sortSprintsPRs(1, 'individual')">${getArrow(1)}</button></th>
+    <th>200m <button type="button" class="mini-sort" onclick="sortSprintsPRs(2, 'individual')">${getArrow(2)}</button></th>
+    <th>400m <button type="button" class="mini-sort" onclick="sortSprintsPRs(3, 'individual')">${getArrow(3)}</button></th>
+    <th>800m <button type="button" class="mini-sort" onclick="sortSprintsPRs(4, 'individual')">${getArrow(4)}</button></th>
+    <th>100/110H <button type="button" class="mini-sort" onclick="sortSprintsPRs(5, 'individual')">${getArrow(5)}</button></th>
+    <th>300H <button type="button" class="mini-sort" onclick="sortSprintsPRs(6, 'individual')">${getArrow(6)}</button></th>
     </tr>
     </thead>
     <tbody>
     `;
 
     rows.forEach(row => {
-        const name = cleanName(row.name);       // now object
+        const name = cleanName(row.name);
         if (!name) return;
 
         const m100 = row.m100 || '--';
@@ -2088,6 +2228,7 @@ function getCurrentMeetData() {
 
 // START OF JUMPS CODE
 let allJumpsPRs = [];
+let jumpsPRSortState = { column: null, ascending: true };
 let jumpsMeetData = [];
 let jumpsMeetSortState = { column: null, ascending: true };
 
@@ -2100,8 +2241,13 @@ async function fetchJumpsPRs() {
         
         if (!data.values || data.values.length === 0) {
             document.getElementById("jumps-pr-container").innerHTML = "<p>No jumps PR data found.</p>";
+            const jumpsSearch = document.getElementById('jumps-pr-search');
+            if (jumpsSearch) jumpsSearch.value = '';
             return;
         }
+
+        const jumpsSearchIn = document.getElementById('jumps-pr-search');
+        if (jumpsSearchIn) jumpsSearchIn.value = '';
 
         // Map the unified columns: Name, LJ, TJ, HJ, PV
         allJumpsPRs = data.values.map(row => ({
@@ -2112,6 +2258,7 @@ async function fetchJumpsPRs() {
             pole: row[4] || "--"
         }));
 
+        jumpsPRSortState = { column: null, ascending: true };
         renderJumpsPRTable();
     } catch (error) {
         console.error("Jumps PR Fetch Error:", error);
@@ -2124,27 +2271,94 @@ async function fetchJumpsPRs() {
     }
 }
 
+function getJumpsPRSortField(row, columnIndex) {
+    const keys = ['name', 'long', 'triple', 'high', 'pole'];
+    return row[keys[columnIndex]] ?? '';
+}
+
+function getJumpsPRRowsForDisplay() {
+    const input = document.getElementById('jumps-pr-search');
+    const q = input ? input.value.toLowerCase().trim() : '';
+    const athletes = allJumpsPRs.filter(a => a.name);
+    if (!q) return athletes;
+    return athletes.filter(a => a.name.toLowerCase().includes(q));
+}
+
+function orderedJumpsPRRows(rowsIn) {
+    let data = rowsIn != null ? [...rowsIn] : allJumpsPRs.filter(a => a.name);
+    if (jumpsPRSortState.column === null) return data;
+
+    const col = jumpsPRSortState.column;
+    const asc = jumpsPRSortState.ascending;
+    data = [...data];
+    data.sort((a, b) => {
+        const rawA = getJumpsPRSortField(a, col);
+        const rawB = getJumpsPRSortField(b, col);
+        if (col === 0) {
+            const nameA = (rawA || '').toLowerCase();
+            const nameB = (rawB || '').toLowerCase();
+            return asc ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        }
+        const emptyA = isEmptyFieldEventMark(rawA);
+        const emptyB = isEmptyFieldEventMark(rawB);
+        if (emptyA && emptyB) return 0;
+        if (emptyA) return 1;
+        if (emptyB) return -1;
+        const distA = parseThrowDistance(rawA);
+        const distB = parseThrowDistance(rawB);
+        return asc ? distB - distA : distA - distB;
+    });
+    return data;
+}
+
+window.sortJumpsPRs = function (columnIndex) {
+    if (allJumpsPRs.filter(a => a.name).length === 0) return;
+    if (jumpsPRSortState.column === columnIndex) {
+        jumpsPRSortState.ascending = !jumpsPRSortState.ascending;
+    } else {
+        jumpsPRSortState.column = columnIndex;
+        jumpsPRSortState.ascending = true;
+    }
+    renderJumpsPRTable();
+};
+
+window.filterJumpsPRs = function () {
+    renderJumpsPRTable();
+};
+
+window.resetJumpsPRs = function () {
+    const input = document.getElementById('jumps-pr-search');
+    if (input) input.value = '';
+    jumpsPRSortState = { column: null, ascending: true };
+    renderJumpsPRTable();
+};
+
 function renderJumpsPRTable() {
     const container = document.getElementById("jumps-pr-container");
     if (!container) return;
+
+    const rows = orderedJumpsPRRows(getJumpsPRRowsForDisplay());
+    const getArrow = (col) => {
+        if (jumpsPRSortState.column !== col) return '⇅';
+        return jumpsPRSortState.ascending ? '▲' : '▼';
+    };
 
     let html = `
     <table>
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Long Jump</th>
-                <th>Triple Jump</th>
-                <th>High Jump</th>
-                <th>Pole Vault</th>
+                <th onclick="sortJumpsPRs(0)" style="cursor:pointer">Name ${getArrow(0)}</th>
+                <th>Long Jump <button type="button" class="mini-sort" onclick="sortJumpsPRs(1)">${getArrow(1)}</button></th>
+                <th>Triple Jump <button type="button" class="mini-sort" onclick="sortJumpsPRs(2)">${getArrow(2)}</button></th>
+                <th>High Jump <button type="button" class="mini-sort" onclick="sortJumpsPRs(3)">${getArrow(3)}</button></th>
+                <th>Pole Vault <button type="button" class="mini-sort" onclick="sortJumpsPRs(4)">${getArrow(4)}</button></th>
             </tr>
         </thead>
         <tbody>
     `;
 
-    allJumpsPRs.forEach(athlete => {
-        if (athlete.name) {
-            html += `
+    rows.forEach(athlete => {
+        html += `
             <tr>
                 <td class="name-cell">${cleanName(athlete.name)}</td>
                 <td>${athlete.long}</td>
@@ -2153,7 +2367,6 @@ function renderJumpsPRTable() {
                 <td>${athlete.pole}</td>
             </tr>
             `;
-        }
     });
 
     html += "</tbody></table>";
@@ -2378,6 +2591,11 @@ function parseThrowDistance(distStr) {
     return totalInches;
 }
 
+function isEmptyFieldEventMark(val) {
+    if (!val || val === '--' || val === '-' || String(val).trim() === '') return true;
+    return parseThrowDistance(val) === 0;
+}
+
 function resetJumpsMeetSort() {
     const searchBar = document.getElementById("jumps-meet-search");
     if (searchBar) searchBar.value = "";
@@ -2464,13 +2682,13 @@ async function fetchSprintsPRs() {
 
 // --- Reset Sprints PR Table ---
 window.resetSprintsPRs = function() {
-    // Clear search input
     document.getElementById('sprints-pr-search').value = '';
-    
-    // Re-render both to ensure all rows are visible
-    renderSprintsPRTable(allSprintsPRs);
-    renderSprintsRelayTable();
-    
+    sprintsIndividualPRSortState = { column: null, ascending: true };
+    sprintsRelayPRSortState = { column: null, ascending: true };
+
+    renderSprintsPRTable(orderedSprintsPRRows('individual'));
+    renderSprintsRelayTable(orderedSprintsPRRows('relay'));
+
     console.log("Sprints PRs reset.");
 };
 
@@ -2529,28 +2747,36 @@ document.querySelectorAll(".sub-tab").forEach(btn => {
     });
 });
 
-function renderSprintsRelayTable() {
+function renderSprintsRelayTable(rowsToRender) {
     const container = document.getElementById("sprints-relays-container");
+    if (!container) return;
+
+    const rows = rowsToRender || allSprintsPRs;
+
+    const getArrow = (col) => {
+        if (sprintsRelayPRSortState.column !== col) return '⇅';
+        return sprintsRelayPRSortState.ascending ? '▲' : '▼';
+    };
 
     let html = `
     <table>
     <thead>
     <tr>
-        <th>Name</th>
-        <th>4x100</th>
-        <th>4x400</th>
-        <th>4x200</th>
+        <th onclick="sortSprintsPRs(0, 'relay')" style="cursor:pointer">Name ${getArrow(0)}</th>
+        <th>4x100 <button type="button" class="mini-sort" onclick="sortSprintsPRs(1, 'relay')">${getArrow(1)}</button></th>
+        <th>4x400 <button type="button" class="mini-sort" onclick="sortSprintsPRs(2, 'relay')">${getArrow(2)}</button></th>
+        <th>4x200 <button type="button" class="mini-sort" onclick="sortSprintsPRs(3, 'relay')">${getArrow(3)}</button></th>
     </tr>
     </thead>
     <tbody>
     `;
 
-    allSprintsPRs.forEach(row => {
+    rows.forEach(row => {
         if (!row.name) return;
 
         html += `
         <tr>
-            <td class="name-cell">${row.name}</td>
+            <td class="name-cell">${cleanName(row.name)}</td>
             <td>${row.relay4x100 || '--'}</td>
             <td>${row.relay4x400 || '--'}</td>
             <td>${row.relay4x200 || '--'}</td>
@@ -2621,10 +2847,13 @@ window.switchSprintsPRTab = function(tab) {
     if (tab === 'individual') {
         individualWrapper.classList.remove("hidden-section");
         relayWrapper.classList.add("hidden-section");
-        renderSprintsPRTable(allSprintsPRs); // Refresh Indiv
+        renderSprintsPRTable(orderedSprintsPRRows('individual'));
     } else {
         individualWrapper.classList.add("hidden-section");
         relayWrapper.classList.remove("hidden-section");
-        renderSprintsRelayTable(); // Refresh Relays
+        renderSprintsRelayTable(orderedSprintsPRRows('relay'));
     }
+
+    const q = document.getElementById('sprints-pr-search')?.value?.trim();
+    if (q) filterSprintsPRs();
 };

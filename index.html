@@ -113,6 +113,10 @@
         <div class="throws-grid">
             <section id="throws-pr-section">
                 <h2>Throws Personal Records</h2>
+                <div class="controls">
+                    <input type="text" id="throws-pr-search" placeholder="Search athlete..." onkeyup="filterThrowsPRs()">
+                    <button type="button" onclick="resetThrowsPRs()" class="reset-btn">Reset Order</button>
+                </div>
                 <div id="throws-pr-container">
                     <p>Loading Throws PRs...</p>
                 </div>
@@ -203,6 +207,10 @@
         <div class="throws-grid">
             <section id="jumps-pr-section">
                 <h2>Jumps Personal Records</h2>
+                <div class="controls">
+                    <input type="text" id="jumps-pr-search" placeholder="Search athlete..." onkeyup="filterJumpsPRs()">
+                    <button type="button" onclick="resetJumpsPRs()" class="reset-btn">Reset Order</button>
+                </div>
                 <div id="jumps-pr-container">
                     <p>Loading Jumps PRs...</p>
                 </div>

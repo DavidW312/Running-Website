@@ -951,7 +951,9 @@ th.sortable.active-desc::after {
 #meet-search,
 #sprints-meet-search,
 #sprints-pr-search,
+#throws-pr-search,
 #throws-meet-search,
+#jumps-pr-search,
 #jumps-meet-search,
 #pr-search {
     width: 280px;
@@ -968,7 +970,9 @@ th.sortable.active-desc::after {
 
 #distance-meet-search:focus,
 #sprints-meet-search:focus,
+#throws-pr-search:focus,
 #throws-meet-search:focus,
+#jumps-pr-search:focus,
 #jumps-meet-search:focus {
     border-color: chocolate;
     box-shadow: 0 0 0 3px rgba(210,105,30,0.15);
