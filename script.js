@@ -18,6 +18,25 @@ let currentThrowsMeet = null;
 let throwsMeetSortState = { column: null, ascending: true };
 let allThrowsPRs = []; // separate array for throws PRS
 
+let originalThrowsRows = [];
+let originalSprintsRows = [];
+let originalJumpsRows = [];
+
+// --- DISTANCE STATE ---
+let allDistancePRs = []; // Rename allPRs to this for clarity
+let distanceMeetData = []; // Rename allRaceData to this
+let distanceSortState = { column: null, ascending: true };
+
+// --- SPRINTS STATE ---
+let allSprintsPRs = [];
+let sprintsMeetData = [];
+let sprintsSortState = { column: null, ascending: true };
+
+let sprintsMeetSortState = { column: null, ascending: true };
+let currentSprintsMeet = "";
+
+let currentSprintsMeetTab = "individual"; // Default tab
+
 // --- 1. INITIALIZATION ---
 
 // ==============================
@@ -38,8 +57,11 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // 5️⃣ Setup sport tabs (Distance / Throws)
     const sportTabs = document.querySelectorAll(".sport-tab");
+
     const distanceWrapper = document.getElementById("distance-wrapper");
     const throwsWrapper = document.getElementById("throws-wrapper");
+    const sprintsWrapper = document.getElementById("sprints-wrapper");
+    const jumpsWrapper = document.getElementById("jumps-wrapper");
 
     sportTabs.forEach(tab => {
         tab.addEventListener("click", async () => {
@@ -50,20 +72,59 @@ window.addEventListener("DOMContentLoaded", async () => {
             tab.classList.add("active");
 
             if (selectedSport === "distance") {
+
                 distanceWrapper.classList.remove("hidden-section");
                 throwsWrapper.classList.add("hidden-section");
+                sprintsWrapper.classList.add("hidden-section");
+                jumpsWrapper.classList.add("hidden-section");
+
                 displaySelectedMeet();
-            } else {
+
+            } 
+            else if (selectedSport === "throws") {
+
                 distanceWrapper.classList.add("hidden-section");
                 throwsWrapper.classList.remove("hidden-section");
+                sprintsWrapper.classList.add("hidden-section");
+                jumpsWrapper.classList.add("hidden-section");
 
-                // Lazy-load Throws data only once
                 if (!window.throwsLoaded) {
-                    await fetchThrowsPRs(); // Load PRs first
-                    await fetchThrowsMeetResults(); // Then results
-                    window.throwsLoaded = true;
+                    await fetchThrowsPRs();
+                    await fetchThrowsMeetResults();
+                   window.throwsLoaded = true;
                 }
+
                 displaySelectedThrowsMeet();
+            }
+            else if (selectedSport === "sprints") {
+
+                distanceWrapper.classList.add("hidden-section");
+                throwsWrapper.classList.add("hidden-section");
+                sprintsWrapper.classList.remove("hidden-section");
+                jumpsWrapper.classList.add("hidden-section");
+
+                if (!window.sprintsLoaded) {
+                    await fetchSprintsPRs();
+                    await fetchSprintsMeetResults();
+                    window.sprintsLoaded = true;
+                }
+
+                displaySelectedSprintsMeet();
+            }
+            else if (selectedSport === "jumps") {
+
+                distanceWrapper.classList.add("hidden-section");
+                throwsWrapper.classList.add("hidden-section");
+                sprintsWrapper.classList.add("hidden-section");
+                jumpsWrapper.classList.remove("hidden-section");
+
+                if (!window.jumpsLoaded) {
+                    await fetchJumpsPRs();
+                    await fetchJumpsMeetResults();
+                    window.jumpsLoaded = true;
+                }
+
+                displaySelectedJumpsMeet();
             }
         });
     });
@@ -446,23 +507,15 @@ window.resetSort = function() {
  * 3. If PR exists: Highlight only if race time is faster.
  */
 function isNewPR(raceTimeStr, prTimeStr) {
-    // RULE 1: If there is no race result, it can't be a PR.
     if (!raceTimeStr || raceTimeStr === '-' || raceTimeStr === '0' || raceTimeStr.trim() === '') {
         return false;
     }
-    
-    // RULE 2: If the athlete has NO recorded PR yet (Debut)
     const isFirstTime = (!prTimeStr || prTimeStr === '--' || prTimeStr.trim() === '');
-    if (isFirstTime) {
-        return true; 
-    }
+    if (isFirstTime) return true; 
 
-    // RULE 3: Comparison for existing PRs
     const raceSec = timeToSeconds(raceTimeStr);
     const prSec = timeToSeconds(prTimeStr);
     
-    // Only return true if they actually improved (raceSec is smaller than prSec (or equal to, in case of updating the PR Table,
-    // so it still displays that that person PR'd at that meet))
     return (raceSec > 0 && raceSec <= prSec);
 }
 
@@ -470,37 +523,46 @@ function isNewPR(raceTimeStr, prTimeStr) {
  * Fetches the PR tab.
  */
 async function fetchPRs() {
+    // Note: Ensure the Tab name in your Google Sheet is exactly "PRs"
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/PRs!A1:E?key=${API_KEY}`;
     try {
         const response = await fetch(url);
         const data = await response.json();
         if (data.values) {
-            allPRs = data.values; 
-            renderPRTable(allPRs);
-            return true; // Send signal that data is loaded
+            // Store in the correct global variable
+            allDistancePRs = data.values; 
+            renderPRTable(allDistancePRs);
+            return true;
         }
     } catch (e) { 
         console.error("PR Fetch Error:", e); 
-        return false;
+        return false; 
     }
 }
 
 /**
- * Renders the PR table with clean names and sort arrows.
+ * 2. RENDER PR TABLE
+ * The only function that actually puts HTML into the pr-container.
  */
-function renderPRTable(rows) {
+function renderPRTable(rowsToRender) {
     const container = document.getElementById('pr-container');
-    const dataRows = (rows[0] && rows[0][0] === "Name") ? rows.slice(1) : rows;
+    if (!container) return;
+
+    // Safety: If no rows passed, try to use global data
+    const data = rowsToRender || allDistancePRs;
+
+    // Filter out the header row "Name" and any empty rows
+    const dataRows = data.filter(row => row[0] && row[0].trim().toLowerCase() !== "name");
 
     const getArrow = (col) => {
-        if (prSortState.column !== col) return "⇅";
-        return prSortState.ascending ? "▲" : "▼";
+        if (distancePRSortState.column !== col) return "⇅";
+        return distancePRSortState.ascending ? "▲" : "▼";
     };
 
     let html = `<table>
                 <thead>
                     <tr>
-                        <th>Name</th>
+                        <th onclick="sortPRs(0)" style="cursor:pointer">Name ${getArrow(0)}</th>
                         <th>800m <button class="mini-sort" onclick="sortPRs(1)">${getArrow(1)}</button></th>
                         <th>1600m <button class="mini-sort" onclick="sortPRs(2)">${getArrow(2)}</button></th>
                         <th>3200m <button class="mini-sort" onclick="sortPRs(3)">${getArrow(3)}</button></th>
@@ -509,8 +571,10 @@ function renderPRTable(rows) {
                 </thead>
                 <tbody>`;
 
-    dataRows.forEach(row => {
-        if (row[0]) {
+    if (dataRows.length === 0) {
+        html += `<tr><td colspan="5" style="text-align:center; padding:20px;">No athlete data found. Check your 'PRs' tab in Google Sheets.</td></tr>`;
+    } else {
+        dataRows.forEach(row => {
             html += `<tr>
                 <td class="name-cell" 
                     style="cursor:pointer; color:chocolate; text-decoration:underline;" 
@@ -522,46 +586,103 @@ function renderPRTable(rows) {
                 <td>${row[3] || '--'}</td>
                 <td>${row[4] || '--'}</td>
             </tr>`;
-        }
-    });
-    container.innerHTML = html + "</tbody></table>";
+        });
+    }
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
 }
 
 /**
- * Handles toggling between ascending/descending for PR times.
+ * 3. SORT PRS
+ * Re-sorts the global allDistancePRs and triggers a re-render.
  */
 window.sortPRs = function(columnIndex) {
-    let dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
-    if (prSortState.column === columnIndex) {
-        prSortState.ascending = !prSortState.ascending;
+    // 1. Get current data (minus header)
+    let dataOnly = allDistancePRs.filter(row => row[0] && row[0].trim().toLowerCase() !== "name");
+
+    if (dataOnly.length === 0) return;
+
+    // 2. Toggle direction
+    if (distancePRSortState.column === columnIndex) {
+        distancePRSortState.ascending = !distancePRSortState.ascending;
     } else {
-        prSortState.column = columnIndex;
-        prSortState.ascending = true;
+        distancePRSortState.column = columnIndex;
+        distancePRSortState.ascending = true;
     }
+
+    // 3. Perform Sort
     dataOnly.sort((a, b) => {
-        const timeA = timeToSeconds(a[columnIndex]);
-        const timeB = timeToSeconds(b[columnIndex]);
-        return prSortState.ascending ? timeA - timeB : timeB - timeA;
+        if (columnIndex === 0) {
+            const nameA = (a[0] || "").toLowerCase();
+            const nameB = (b[0] || "").toLowerCase();
+            return distancePRSortState.ascending ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        } else {
+            const timeA = timeToSeconds(a[columnIndex]);
+            const timeB = timeToSeconds(b[columnIndex]);
+            
+            // Push empty values to bottom
+            if (timeA === 0) return 1;
+            if (timeB === 0) return -1;
+            
+            return distancePRSortState.ascending ? timeA - timeB : timeB - timeA;
+        }
     });
+
+    // 4. Update Table
     renderPRTable(dataOnly);
 };
 
 /**
- * Filters PR table based on name search.
+ * 4. FILTER PRS
+ * Searches the global allDistancePRs.
  */
 window.filterPRs = function() {
-    const searchTerm = document.getElementById('pr-search').value.toLowerCase();
-    const dataOnly = (allPRs[0] && allPRs[0][0] === "Name") ? allPRs.slice(1) : allPRs;
-    const filtered = dataOnly.filter(row => row[0] && row[0].toLowerCase().includes(searchTerm));
+    const searchInput = document.getElementById('pr-search');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    
+    const dataOnly = allDistancePRs.filter(row => row[0] && row[0].trim().toLowerCase() !== "name");
+    
+    const filtered = dataOnly.filter(row => 
+        row[0] && row[0].toLowerCase().includes(searchTerm)
+    );
+    
     renderPRTable(filtered);
 };
 
+// allSprintsPRs = [{name, m100, m200, ...}, {...}, ...]
+window.filterSprintsPRs = function() {
+    const query = document.getElementById("sprints-pr-search").value.toLowerCase().trim();
+    
+    // 1. Determine which table is currently visible
+    const isRelayTab = !document.getElementById("sprints-relays").classList.contains("hidden-section");
+    const activeContainerId = isRelayTab ? "sprints-relays-container" : "sprints-pr-container";
+    
+    // 2. Target rows only in that active container
+    const rows = document.querySelectorAll(`#${activeContainerId} tbody tr`);
+    
+    rows.forEach(row => {
+        const nameCell = row.querySelector(".name-cell");
+        if (nameCell) {
+            const name = nameCell.textContent.toLowerCase();
+            row.style.display = name.includes(query) ? "" : "none";
+        }
+    });
+};
+
+function resetSprintsPRs() {
+    document.getElementById('sprints-pr-search').value = '';
+    renderSprintsPRTable(allSprintsPRs);
+}
+
 /**
- * Resets PRs to alphabetical.
+ * 5. RESET PRS
  */
 window.resetPRs = function() {
-    prSortState = { column: null, ascending: true };
-    renderPRTable(allPRs);
+    const searchInput = document.getElementById('pr-search');
+    if (searchInput) searchInput.value = "";
+    distancePRSortState = { column: null, ascending: true };
+    renderPRTable(allDistancePRs);
 };
 
 // --- 5. MEET RESULTS ENGINE ---
@@ -574,22 +695,43 @@ async function fetchRaceResults() {
     try {
         const response = await fetch(url);
         const data = await response.json();
-        
-        if (!data.values || data.values.length === 0) {
-            document.getElementById('meet-results-container').innerHTML = "<p>No race results found.</p>";
-            return;
+        if (!data.values || data.values.length === 0) return;
+
+        distanceMeetData = data.values;
+
+        // Extract unique meets and find their newest date
+        const meetMap = {};
+        distanceMeetData.forEach(row => {
+            const name = row[1];
+            const dateStr = row[2] || "";
+            if (name) {
+                const parts = dateStr.split('/');
+                let ts = 0;
+                if (parts.length === 3) {
+                    let [m, d, y] = parts.map(n => parseInt(n));
+                    if (y < 100) y += 2000;
+                    ts = new Date(y, m - 1, d).getTime();
+                }
+                if (!meetMap[name] || ts > meetMap[name].ts) {
+                    meetMap[name] = { name, ts };
+                }
+            }
+        });
+
+        const sortedMeets = Object.values(meetMap).sort((a, b) => a.ts - b.ts).map(o => o.name);
+        const selector = document.getElementById('distance-meet-selector');
+
+        selector.innerHTML = sortedMeets.map(m => `<option value="${m}">${m}</option>`).join('');
+
+        if (sortedMeets.length > 0) {
+            selector.value = sortedMeets[sortedMeets.length - 1]; // Select newest
+            document.getElementById('meet-tabs').style.display = 'block';
+            document.getElementById('meet-results-controls').style.display = 'block';
+            window.displaySelectedMeet(); 
         }
-
-        allRaceData = data.values;
-        populateMeetSelector(allRaceData);
-        
-        const lastMeet = allRaceData[allRaceData.length - 1][1];
-        document.getElementById('meet-selector').value = lastMeet;
-        displaySelectedMeet();
-
-        document.getElementById('meet-tabs').style.display = 'flex';
-
-    } catch (error) { console.error("Race Results Error:", error); }
+    } catch (error) {
+        console.error("Distance Meet Fetch Error:", error);
+    }
 }
 
 function populateMeetSelector(rows) {
@@ -603,181 +745,125 @@ function populateMeetSelector(rows) {
  * Checks for PRs and highlights them in green with a star.
  */
 window.displaySelectedMeet = function() {
-    // FIX: Only wait for Distance PRs, not Throws PRs
-    if (allPRs.length === 0) {
+    // Ensure Distance PRs are loaded
+    if (allDistancePRs.length === 0) {
         setTimeout(displaySelectedMeet, 100);
         return;
     }
 
-    const selectedMeet = document.getElementById('meet-selector').value;
+    const selector = document.getElementById('distance-meet-selector');
+    const selectedMeet = selector.value;
+    const container = document.getElementById('meet-results-container');
+    
     if (!selectedMeet) {
-        const container = document.getElementById('meet-results-container');
-        if (container) container.innerHTML = "<p>Select a meet to view results.</p>";
+        container.innerHTML = "<p>Select a distance meet to view results.</p>";
         return;
     }
 
-    const container = document.getElementById('meet-results-container');
-    const meetRows = allRaceData.filter(row => row[1] === selectedMeet);
-
-    // Show/hide controls only when there's data
-    document.getElementById('meet-results-controls').style.display = 
-    (meetRows.length > 0 && selectedMeet) ? 'flex' : 'none';
-
-    document.getElementById('meet-search').value = '';
-
-    // Store clean copy for reset/sort
-    originalMeetRows = meetRows.map(row => [...row]);  // deep copy per row
-
-    document.getElementById('meet-tabs').style.display = meetRows.length > 0 ? 'flex' : 'none';
-
+    const meetRows = distanceMeetData.filter(row => row[1] === selectedMeet);
     let filteredRows;
-    let tableTitle;
     let headers;
 
     if (currentMeetTab === "relay") {
-        // Include rows that have AT LEAST one relay split
-        filteredRows = meetRows.filter(row => 
-            (row[7] && row[7].trim() !== '' && row[6] !== '-') ||
-            (row[9] && row[9].trim() !== '' && row[8] !== '-')
-        );
-        tableTitle = "Relay Performances";
+        filteredRows = meetRows.filter(row => (row[7] && row[7] !== '-' && row[7] !== ''));
         headers = ["Athlete", "Team Time 1", "Event 1", "Team Time 2", "Event 2"];
     } else {
-        filteredRows = meetRows.filter(row => 
-            (row[3] && row[3].trim() !== '' && row[3] !== '-') || 
-            (row[4] && row[4].trim() !== '' && row[4] !== '-') || 
-            (row[5] && row[5].trim() !== '' && row[5] !== '-') || 
-            (row[6] && row[6].trim() !== '' && row[6] !== '-')
-        );
-        tableTitle = "Individual Events";
+        filteredRows = meetRows.filter(row => (row[3] || row[4] || row[5] || row[6]));
         headers = ["Athlete", "800m", "1600m", "3200m", "1 Mile"];
     }
 
     let totalPerformances = 0;
     let totalPRs = 0;
 
-    let html = `<table>
-        <thead>
-            <tr>`;
-
+    let html = `<table><thead><tr>`;
     headers.forEach((h, index) => {
-        html += `<th class="sortable" data-index="${index}" onclick="sortMeetResults(${index})">${h}</th>`;
+        html += `<th class="sortable" onclick="sortDistanceMeet(${index})">${h}</th>`;
     });
-
     html += `</tr></thead><tbody>`;
 
     filteredRows.forEach(row => {
         const athleteName = row[0] || "";
-        const athletePR = allPRs.find(p => 
+        const athletePR = allDistancePRs.find(p => 
             (p[0] || "").trim().toLowerCase() === athleteName.trim().toLowerCase()
         ) || [];
 
         if (currentMeetTab === "relay") {
-            const teamTime1 = row[7] || '-';
-            const event1     = row[8] || '-';
-            const teamTime2  = row[9] || '-';
-            const event2     = row[10] || '-';
-        
-            // Skip if both team times are empty/invalid
-            if (teamTime1 === '-' && teamTime2 === '-') return;
-        
-            html += `
-                <tr>
-                    <td class="name-cell">${cleanName(athleteName)}</td>
-                    <td class="relay-split-cell" style="font-weight: bold; color: #c0392b;">${teamTime1}</td>
-                    <td class="relay-event-cell">${event1}</td>
-                    <td class="relay-split-cell" style="font-weight: bold; color: #c0392b;">${teamTime2}</td>
-                    <td class="relay-event-cell">${event2}</td>
-                </tr>`;
+            html += `<tr>
+                <td class="name-cell">${cleanName(athleteName)}</td>
+                <td style="font-weight:bold; color:#c0392b;">${row[7] || '-'}</td>
+                <td>${row[8] || '-'}</td>
+                <td style="font-weight:bold; color:#c0392b;">${row[9] || '-'}</td>
+                <td>${row[10] || '-'}</td>
+            </tr>`;
         } else {
-            // Individual – same as before
             const formatCell = (raceTime, prTime) => {
-                if (!raceTime || raceTime === '-' || raceTime === '0' || raceTime.trim() === '') {
-                    return '-';
-                }
+                if (!raceTime || raceTime === '-' || raceTime === '0') return '-';
                 totalPerformances++;
-
                 if (isNewPR(raceTime, prTime)) {
                     totalPRs++;
                     const delta = formatTimeDelta(prTime, raceTime);
-                    return `
-                        <span class="pr-highlight">
-                            ${raceTime}
-                            <span class="pr-star">⭐</span>
-                            <span class="pr-delta">${delta}</span>
-                        </span>`;
+                    return `<span class="pr-highlight">${raceTime} ⭐ <span class="pr-delta">${delta}</span></span>`;
                 }
                 return raceTime;
             };
 
-            html += `
-                <tr>
-                    <td class="name-cell">${cleanName(athleteName)}</td>
-                    <td>${formatCell(row[3], athletePR[1])}</td>
-                    <td>${formatCell(row[4], athletePR[2])}</td>
-                    <td>${formatCell(row[5], athletePR[3])}</td>
-                    <td>${formatCell(row[6], athletePR[4])}</td>
-                </tr>`;
+            html += `<tr>
+                <td class="name-cell">${cleanName(athleteName)}</td>
+                <td>${formatCell(row[3], athletePR[1])}</td>
+                <td>${formatCell(row[4], athletePR[2])}</td>
+                <td>${formatCell(row[5], athletePR[3])}</td>
+                <td>${formatCell(row[6], athletePR[4])}</td>
+            </tr>`;
         }
     });
 
-    html += "</tbody></table>";
-
-    // Summary
-    let summaryText;
-    if (currentMeetTab === "relay") {
-        let totalAthleteParticipations = 0;
-        const uniqueRelays = new Set();  // still keep unique team results
-
-        filteredRows.forEach(row => {
-            const time1 = (row[7] || '').trim();
-            const event1 = (row[8] || '').trim();
-            if (time1 !== '' && time1 !== '-' && time1 !== '0') {
-                totalAthleteParticipations++;
-                uniqueRelays.add(`${time1}||${event1}`);
-            }
-
-            const time2 = (row[9] || '').trim();
-            const event2 = (row[10] || '').trim();
-            if (time2 !== '' && time2 !== '-' && time2 !== '0') {
-                totalAthleteParticipations++;
-                uniqueRelays.add(`${time2}||${event2}`);
-            }
-        });
-
-        const uniqueCount = uniqueRelays.size;
-
-        summaryText = `
-            ${totalAthleteParticipations} relay athlete performances,
-            ${uniqueCount} unique relay team result${uniqueCount === 1 ? '' : 's'}
-        `;
-    } else {
-        let prRate = totalPerformances > 0 
-            ? ((totalPRs / totalPerformances) * 100).toFixed(1) 
-            : 0;
-        summaryText = `<strong>PR Rate:</strong> ${prRate}% (${totalPRs} PRs out of ${totalPerformances} races)`;
-    }
-
+    const prRate = totalPerformances > 0 ? ((totalPRs / totalPerformances) * 100).toFixed(1) : 0;
     const summaryHTML = `
         <div class="meet-summary">
-            <h3>${selectedMeet} – ${tableTitle}</h3>
-            <p>${summaryText}</p>
-        </div>
-    `;
+            <h3>${selectedMeet}</h3>
+            <p><strong>PR Rate:</strong> ${prRate}% (${totalPRs} PRs out of ${totalPerformances} races)</p>
+        </div>`;
 
-    // After rendering, apply current sort state to headers
-    setTimeout(() => {
-        if (meetSortState.column !== null) {
-            updateHeaderArrows(meetSortState.column);
+    container.innerHTML = summaryHTML + html + "</tbody></table>";
+};
+
+window.sortDistanceMeet = function(columnIndex) {
+    const container = document.getElementById('meet-results-container');
+    const table = container.querySelector('table');
+    if (!table) return;
+
+    if (distanceSortState.column === columnIndex) {
+        distanceSortState.ascending = !distanceSortState.ascending;
+    } else {
+        distanceSortState.column = columnIndex;
+        distanceSortState.ascending = true;
+    }
+
+    const tbody = table.querySelector('tbody');
+    const rowsArray = Array.from(tbody.querySelectorAll('tr'));
+
+    rowsArray.sort((a, b) => {
+        let valA = getSortValue(a, columnIndex);
+        let valB = getSortValue(b, columnIndex);
+
+        if (valA === valB) return 0;
+        if (valA === '-' || valA === '') return 1;
+        if (valB === '-' || valB === '') return -1;
+
+        if (columnIndex === 0) { // Name
+            return distanceSortState.ascending ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else { // Times
+            return distanceSortState.ascending ? valA - valB : valB - valA;
         }
-    }, 0);
+    });
 
-    container.innerHTML = summaryHTML + html;
+    rowsArray.forEach(row => tbody.appendChild(row));
+    updateDistanceHeaderArrows(columnIndex); // Assumes you have your arrow helper
 };
 
 // Filter meet results table by athlete name search
 window.filterMeetResults = function() {
-    const searchTerm = document.getElementById('meet-search').value.toLowerCase().trim();
+    const searchTerm = document.getElementById('distance-meet-search').value.toLowerCase().trim();
     const container = document.getElementById('meet-results-container');
     const table = container.querySelector('table');
     if (!table) return;
@@ -867,21 +953,49 @@ function updateHeaderArrows(activeColumn) {
 
 // Reset sort + search
 window.resetMeetSort = function() {
-    meetSortState = { column: null, ascending: true };
-    document.getElementById('meet-search').value = '';
-    displaySelectedMeet();  // re-renders + clears arrows
+    // 1. Clear the search input
+    const searchInput = document.getElementById("distance-meet-search") || document.getElementById("meet-search");
+    if (searchInput) searchInput.value = "";
+
+    // 2. Reset the sorting state to default
+    distanceSortState = { column: null, ascending: true };
+
+    // 3. Remove sorting arrows from headers
+    const headers = document.querySelectorAll('#meet-results-container th.sortable');
+    headers.forEach(th => th.classList.remove('active-asc', 'active-desc'));
+
+    // 4. Re-render the table to show all athletes in original order
+    displaySelectedMeet();
+    
+    console.log("Distance results reset successfully.");
+};
+
+window.resetSprintsMeetSort = function() {
+    // 1. Clear the search input
+    const searchInput = document.getElementById("sprints-meet-search");
+    if (searchInput) searchInput.value = "";
+
+    // 2. Reset the sorting state
+    sprintsMeetSortState = { column: null, ascending: true };
+
+    // 3. Remove sorting arrows
+    const headers = document.querySelectorAll('#sprints-meet-results-container th.sortable');
+    headers.forEach(th => th.classList.remove('active-asc', 'active-desc'));
+
+    // 4. Re-render
+    displaySelectedSprintsMeet();
+
+    console.log("Sprints results reset successfully.");
 };
 
 window.switchMeetTab = function(tab) {
     currentMeetTab = tab;
-
-    // Update active button style
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    // Update button visuals
+    document.querySelectorAll('#meet-tabs .tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
-
-    // Re-render current meet with new tab filter
-    displaySelectedMeet();
+    // Re-render
+    window.displaySelectedMeet();
 };
 
 // --- 6. UTILITY HELPERS ---
@@ -949,90 +1063,137 @@ function updateTimestamp2() {
     document.getElementById('last-updated2').textContent = `Synced with Google Sheets: ${timeString}`;
 }
 
+// Add this helper to your script
+function updateDistanceHeaderArrows(activeColumnIndex) {
+    const headers = document.querySelectorAll('#meet-results-container th.sortable');
+    headers.forEach((th, index) => {
+        th.classList.remove('active-asc', 'active-desc');
+        if (index === activeColumnIndex) {
+            th.classList.add(distanceSortState.ascending ? 'active-asc' : 'active-desc');
+        }
+    });
+}
+
 function showAthleteChart(athleteName) {
-    // 1. Get the data for this person
-    const athleteRaces = allRaceData.filter(row => 
-        row[0] && row[0].trim().toLowerCase() === athleteName.trim().toLowerCase()
-    );
+    if (!athleteName) return;
+    const searchName = athleteName.trim().toLowerCase();
+
+    // 1. Pick the correct data source
+    const resultsSource = (typeof distanceMeetData !== 'undefined' && distanceMeetData.length > 0) ? distanceMeetData : allRaceData;
+    
+    const athleteRaces = resultsSource.filter(row => {
+        const nameInRow = Array.isArray(row) ? row[0] : row.name;
+        return nameInRow && nameInRow.trim().toLowerCase() === searchName;
+    });
 
     if (athleteRaces.length === 0) {
         alert("No race data found for this athlete.");
         return;
     }
 
-    // 2. Setup the Modal and Dropdown
+    // 2. Show Modal
     document.getElementById('chart-modal').style.display = 'block';
     document.getElementById('chart-overlay').style.display = 'block';
     document.getElementById('chart-title').textContent = cleanName(athleteName);
 
-    // Add a dropdown selector if it doesn't exist, or just reset it
-    // Add or find the event selector
+    // 3. Build Dropdown
     let selector = document.getElementById('event-selector');
     if (!selector) {
         selector = document.createElement('select');
         selector.id = 'event-selector';
-        // Styled to look like your other dropdowns
-        // Styled to be more compact
-        selector.style = "width: auto; min-width: 140px; padding: 8px 16px; border-radius: 20px; border: 2px solid #e6c2a6; background: #fffaf5; color: #8b4513; font-weight: bold; cursor: pointer; outline: none; margin: 0 auto 5px auto; display: block;";
-        
-        // Inject it specifically at the top of the content wrapper
-        const wrapper = document.getElementById('chart-content-wrapper');
-        wrapper.insertBefore(selector, wrapper.firstChild);
+        selector.style = "width: auto; min-width: 140px; padding: 8px 16px; border-radius: 20px; border: 2px solid #e6c2a6; background: #fffaf5; color: #8b4513; font-weight: bold; cursor: pointer; margin: 0 auto 15px auto; display: block;";
+        document.getElementById('chart-content-wrapper').prepend(selector);
     }
 
-    // Define the columns: 800m is Col 3, 1600m is Col 4, 3200m is Col 5
+    // Explicit mapping for both Arrays and Objects
     const eventOptions = [
-        { label: "800m", index: 3 },
-        { label: "1600m", index: 4 },
-        { label: "3200m", index: 5 },
-        { label: "1 Mile", index: 6 }
+        { label: "800m", key: 'm800', index: 3 },
+        { label: "1600m", key: 'm1600', index: 4 },
+        { label: "3200m", key: 'm3200', index: 5 },
+        { label: "1 Mile", key: 'm1mile', index: 6 }
     ];
 
-    // Build dropdown and pick the first one that has data
     selector.innerHTML = "";
-    let firstValidIndex = null;
+    let firstValidKey = null;
 
     eventOptions.forEach(opt => {
-        const hasData = athleteRaces.some(r => r[opt.index] && r[opt.index] !== '-' && r[opt.index] !== '0');
+        const hasData = athleteRaces.some(r => {
+            const val = Array.isArray(r) ? r[opt.index] : r[opt.key];
+            return val && val !== '-' && val !== '0' && val !== '';
+        });
+        
         if (hasData) {
             let el = document.createElement('option');
-            el.value = opt.index;
+            el.value = opt.key; // We will always pass the KEY to the update function
             el.textContent = opt.label;
             selector.appendChild(el);
-            if (firstValidIndex === null) firstValidIndex = opt.index;
+            if (!firstValidKey) firstValidKey = opt.key;
         }
     });
 
-    // When the coach changes the dropdown, redraw the chart
-    selector.onchange = () => updateChartLogic(athleteRaces, parseInt(selector.value));
-
-    // 3. Draw the initial chart
-    if (firstValidIndex !== null) {
-        updateChartLogic(athleteRaces, firstValidIndex);
+    if (firstValidKey) {
+        selector.onchange = () => updateChartLogic(athleteRaces, selector.value);
+        // Timeout ensures the modal animation finishes so the chart has a width
+        setTimeout(() => updateChartLogic(athleteRaces, firstValidKey), 100);
     } else {
-        alert("This athlete has no individual race times recorded.");
+        alert("No individual event times (800, 1600, 3200) found for this athlete.");
         closeChart();
     }
 }
 
-function updateChartLogic(athleteRaces, colIndex) {
-    const plotData = athleteRaces
-        .filter(row => row[colIndex] && row[colIndex] !== '-' && row[colIndex] !== '' && row[colIndex] !== '0')
-        .map(row => ({
-            meet: row[1],
-            date: row[2] || "", // Assuming Date is in Column C (Index 2)
-            seconds: timeToSeconds(row[colIndex]),
-            displayTime: row[colIndex]
-        }));
+function updateChartLogic(athleteRaces, activeKey) {
+    // This map ensures that if we are looking for 'm800', we check BOTH the property 'm800' 
+    // AND the index 3 (Column D) in case it's a raw array.
+    const keyToIndex = { 'm800': 3, 'm1600': 4, 'm3200': 5, 'm1mile': 6 };
+    const activeIndex = keyToIndex[activeKey];
 
-    const ctx = document.getElementById('progressionChart').getContext('2d');
-    if (myChart) myChart.destroy();
+    const plotData = athleteRaces.map(row => {
+        let timeStr = "";
+        let meetName = Array.isArray(row) ? row[1] : row.meet;
+        let meetDate = Array.isArray(row) ? row[2] : row.date;
 
-    myChart = new Chart(ctx, {
+        if (Array.isArray(row)) {
+            timeStr = row[activeIndex] || "";
+        } else {
+            timeStr = row[activeKey] || "";
+        }
+
+        return {
+            meet: meetName || "Unknown Meet",
+            date: meetDate || "",
+            seconds: timeToSeconds(timeStr),
+            displayTime: timeStr
+        };
+    })
+    // CRITICAL: Filter out rows that don't have a valid time for THIS specific event
+    .filter(d => d.displayTime && d.displayTime !== '-' && d.displayTime !== '0' && d.seconds > 0);
+
+    // Sort by date (Oldest to Newest)
+    plotData.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA - dateB;
+    });
+
+    const canvas = document.getElementById('progressionChart');
+    const ctx = canvas.getContext('2d');
+
+    if (window.myChart instanceof Chart) {
+        window.myChart.destroy();
+    }
+
+    // If still no points after filtering, log it so we can see why
+    if (plotData.length === 0) {
+        console.warn("Chart Error: No valid data points after filtering for key:", activeKey);
+        return;
+    }
+
+    window.myChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: plotData.map(d => d.date ? `${d.meet} (${d.date})` : d.meet),
             datasets: [{
+                label: activeKey,
                 data: plotData.map(d => d.seconds),
                 borderColor: 'chocolate',
                 backgroundColor: 'rgba(210, 105, 30, 0.2)',
@@ -1040,40 +1201,30 @@ function updateChartLogic(athleteRaces, colIndex) {
                 tension: 0.3,
                 fill: true,
                 pointRadius: 6,
-                pointHoverRadius: 8
+                pointHoverRadius: 9,
+                pointBackgroundColor: 'chocolate'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                // THIS FIXES THE DOTS (Tooltips)
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return ` Time: ${plotData[context.dataIndex].displayTime}`;
+            scales: {
+                y: {
+                    reverse: true, // Lower time = Higher point
+                    ticks: {
+                        callback: (value) => {
+                            let m = Math.floor(value / 60);
+                            let s = Math.floor(value % 60);
+                            return `${m}:${s < 10 ? '0' : ''}${s}`;
                         }
                     }
                 }
             },
-            scales: {
-                x: {
-                    ticks: {
-                        maxRotation: 45, // Tilts the text if it gets too crowded
-                        minRotation: 0,
-                        autoSkip: true,
-                        font: { size: 11 } // Slightly smaller for better fit
-                    },
-                },
-                y: {
-                    reverse: true,
-                    ticks: {
-                        callback: function(value) {
-                            let m = Math.floor(value / 60);
-                            let s = Math.floor(value % 60);
-                            return m + ":" + (s < 10 ? '0' : '') + s;
-                        }
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` Time: ${plotData[ctx.dataIndex].displayTime}`
                     }
                 }
             }
@@ -1469,7 +1620,7 @@ function getThrowsSortValue(row, colIndex) {
     return parseThrowDistance(text); // Shot or Discus
 }
 
-
+/*
 // ------------------------------
 // Parse Throw Distance like 15' 6" → inches
 // ------------------------------
@@ -1488,6 +1639,7 @@ function parseThrowDistance(mark) {
 
     return feet * 12 + inches;
 }
+*/
 
 // ------------------------------
 // Smart display for Throws Meet
@@ -1606,11 +1758,873 @@ function formatThrowDelta(prMark, meetMark) {
     const meetInches = parseThrowDistance(meetMark);
     const prInches   = parseThrowDistance(prMark);
 
-    if (meetInches <= prInches) return ''; // Not a PR
+    const diff = meetInches - prInches;
+    if (diff <= 0) return ""; 
 
-    const deltaInches = meetInches - prInches;
-    const feet = Math.floor(deltaInches / 12);
-    const inches = deltaInches % 12;
+    const feet = Math.floor(diff / 12);
+    let inches = (diff % 12).toFixed(2);
+    inches = parseFloat(inches);
 
     return ` (+${feet}' ${inches}")`;
 }
+
+
+
+function renderSprintsPRTable(rows) {
+    const container = document.getElementById("sprints-pr-container");
+
+    let html = `
+    <table>
+    <thead>
+    <tr>
+    <th>Name</th>
+    <th>100m</th>
+    <th>200m</th>
+    <th>400m</th>
+    <th>800m</th>
+    <th>100/110H</th>
+    <th>300H</th>
+    </tr>
+    </thead>
+    <tbody>
+    `;
+
+    rows.forEach(row => {
+        const name = cleanName(row.name);       // now object
+        if (!name) return;
+
+        const m100 = row.m100 || '--';
+        const m200 = row.m200 || '--';
+        const m400 = row.m400 || '--';
+        const m800 = row.m800 || '--';
+        const h110 = row.hurdles110 || '--';
+        const h300 = row.hurdles300 || '--';
+
+        html += `
+        <tr>
+        <td class="name-cell">${name}</td>
+        <td>${m100}</td>
+        <td>${m200}</td>
+        <td>${m400}</td>
+        <td>${m800}</td>
+        <td>${h110}</td>
+        <td>${h300}</td>
+        </tr>
+        `;
+    });
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
+}
+
+// ==============================
+// SPRINTS MEET RESULTS FUNCTIONS
+// ==============================
+
+// Fetch Sprint meet data
+async function fetchSprintsMeetResults() {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sprints_Results!A2:L?key=${API_KEY}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data.values || data.values.length === 0) return;
+
+        sprintsMeetData = data.values.map(row => ({
+            name: row[0],
+            meet: row[1],
+            date: row[2] || "",
+            m100: row[3],
+            m200: row[4],
+            m400: row[5],
+            m800: row[6],
+            h110: row[7],
+            h300: row[8],
+            r4x100: row[9],
+            r4x400: row[10],
+            r4x200: row[11]
+        }));
+
+        const meetMap = {};
+        sprintsMeetData.forEach(r => {
+            if (r.meet) {
+                const parts = r.date.split('/');
+                let ts = 0;
+                if (parts.length === 3) {
+                    let [m, d, y] = parts.map(n => parseInt(n));
+                    if (y < 100) y += 2000;
+                    ts = new Date(y, m - 1, d).getTime();
+                }
+                if (!meetMap[r.meet] || ts > meetMap[r.meet].ts) {
+                    meetMap[r.meet] = { name: r.meet, ts };
+                }
+            }
+        });
+
+        const sortedNames = Object.values(meetMap).sort((a, b) => a.ts - b.ts).map(o => o.name);
+        const selector = document.getElementById("sprints-meet-selector");
+
+        selector.innerHTML = sortedNames.map(name => `<option value="${name}">${name}</option>`).join('');
+
+        if (sortedNames.length > 0) {
+            selector.value = sortedNames[sortedNames.length - 1]; // Select newest
+            document.getElementById('sprints-meet-results-controls').style.display = 'block';
+            document.getElementById('sprints-meet-summary').classList.remove('hidden-section');
+            window.displaySelectedSprintsMeet();
+        }
+    } catch (error) {
+        console.error("Sprints Meet Fetch Error:", error);
+    }
+}
+
+function sortSprintsMeet(columnIndex){
+    const container = document.getElementById('sprints-meet-results-container');
+    const table = container.querySelector('table');
+    if(!table) return;
+
+    if(sprintsMeetSortState.column === columnIndex){
+        sprintsMeetSortState.ascending = !sprintsMeetSortState.ascending;
+    } else {
+        sprintsMeetSortState.column = columnIndex;
+        sprintsMeetSortState.ascending = true;
+    }
+
+    const tbody = table.querySelector('tbody');
+    const rowsArray = Array.from(tbody.querySelectorAll('tr'));
+
+    rowsArray.sort((a,b)=>{
+        const valA = getSprintsSortValue(a,columnIndex);
+        const valB = getSprintsSortValue(b,columnIndex);
+        if(valA === valB) return 0;
+        if(columnIndex === 0){
+            return sprintsMeetSortState.ascending ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+            return sprintsMeetSortState.ascending ? valA - valB : valB - valA;
+        }
+    });
+
+    rowsArray.forEach(row=>tbody.appendChild(row));
+    updateSprintsHeaderArrows(columnIndex);
+}
+
+function updateSprintsHeaderArrows(activeColumn){
+    const headers = document.querySelectorAll('#sprints-meet-results-container th.sortable');
+    headers.forEach((th,i)=>{
+        th.classList.remove('active-asc','active-desc');
+        if(i === activeColumn){
+            th.classList.add(sprintsMeetSortState.ascending ? 'active-asc':'active-desc');
+        }
+    });
+}
+
+window.displaySelectedSprintsMeet = function() {
+    const selector = document.getElementById('sprints-meet-selector');
+    const container = document.getElementById('sprints-meet-results-container');
+    const selectedMeet = selector.value;
+
+    if (!selectedMeet) return;
+
+    // Reset counters for the Summary Card
+    window._totalPerformances = 0;
+    window._totalPRs = 0;
+
+    const meetRows = sprintsMeetData.filter(r => r.meet === selectedMeet);
+    let headers = [];
+    
+    // Define Headers based on Tab
+    if (currentSprintsMeetTab === "individual") {
+        headers = ["Athlete", "100m", "200m", "400m", "800m", "100/110H", "300H"];
+    } else {
+        headers = ["Athlete", "4x100 Relay", "4x400 Relay", "4x200 Relay"];
+    }
+
+    let tableHtml = `<table><thead><tr>`;
+    headers.forEach((h, i) => {
+        tableHtml += `<th class="sortable" onclick="sortSprintsMeet(${i})">${h}</th>`;
+    });
+    tableHtml += `</tr></thead><tbody>`;
+
+    meetRows.forEach(r => {
+        const athletePR = allSprintsPRs.find(p => p.name.toLowerCase().trim() === r.name.toLowerCase().trim()) || {};
+        
+        tableHtml += `<tr><td class="name-cell">${cleanName(r.name)}</td>`;
+
+        if (currentSprintsMeetTab === "individual") {
+            tableHtml += `<td>${formatCell(r.m100, athletePR.m100)}</td>`;
+            tableHtml += `<td>${formatCell(r.m200, athletePR.m200)}</td>`;
+            tableHtml += `<td>${formatCell(r.m400, athletePR.m400)}</td>`;
+            tableHtml += `<td>${formatCell(r.m800, athletePR.m800)}</td>`;
+            tableHtml += `<td>${formatCell(r.h110, athletePR.hurdles110)}</td>`; // Column H
+            tableHtml += `<td>${formatCell(r.h300, athletePR.hurdles300)}</td>`; // Column I
+        } else {
+            tableHtml += `<td>${formatCell(r.r4x100, athletePR.relay4x100)}</td>`; // Column J
+            tableHtml += `<td>${formatCell(r.r4x400, athletePR.relay4x400)}</td>`; // Column K
+            tableHtml += `<td>${formatCell(r.r4x200, athletePR.relay4x200)}</td>`; // Column L
+        }
+        tableHtml += `</tr>`;
+    });
+
+    tableHtml += "</tbody></table>";
+
+    // Build the Summary Card (Bubble)
+    const prRate = window._totalPerformances > 0 ? ((window._totalPRs / window._totalPerformances) * 100).toFixed(1) : 0;
+    const summaryHTML = `
+        <div class="meet-summary">
+            <h3>${selectedMeet}</h3>
+            <p><strong>Sprint PR Rate:</strong> ${prRate}% (${window._totalPRs} PRs out of ${window._totalPerformances} performances)</p>
+        </div>`;
+
+    container.innerHTML = summaryHTML + tableHtml;
+};
+
+window.switchSprintsMeetTab = function(tab) {
+    currentSprintsMeetTab = tab;
+    
+    // UI Update: Highlight the active button
+    const buttons = document.querySelectorAll('#sprints-meet-tabs .tab-btn');
+    buttons.forEach(btn => {
+        if(btn.textContent.toLowerCase().includes(tab.substring(0,3))) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    window.displaySelectedSprintsMeet(); // Re-render table with new columns
+};
+
+function getSprintsSortValue(row,colIndex){
+
+const cells = row.querySelectorAll('td');
+
+if(!cells[colIndex]) return '';
+
+let text = cells[colIndex].textContent.trim();
+
+text = text.replace(/⭐|\(-?\d+\.\d+s\)/g,'').trim();
+
+if(colIndex === 0) return text;
+
+return timeToSeconds(text);
+
+}
+
+// Add/Replace these to ensure the search bars work for Sprints & Jumps
+function filterSprintsMeetResults() {
+    const query = document.getElementById("sprints-meet-search").value.toLowerCase().trim();
+    const rows = document.querySelectorAll("#sprints-meet-results-container tbody tr");
+    rows.forEach(row => {
+        const name = row.querySelector(".name-cell")?.textContent.toLowerCase() || "";
+        row.style.display = name.includes(query) ? "" : "none";
+    });
+}
+
+window.filterJumpsMeetResults = function() {
+    const query = document.getElementById("jumps-meet-search").value.toLowerCase().trim();
+    const rows = document.querySelectorAll("#jumps-meet-results-container tbody tr");
+    rows.forEach(row => {
+        const name = row.querySelector(".name-cell")?.textContent.toLowerCase() || "";
+        row.style.display = name.includes(query) ? "" : "none";
+    });
+};
+
+function resetSprintsMeetSort(){
+
+document.getElementById("sprints-meet-search").value = "";
+
+sprintsMeetSortState = { column:null, ascending:true };
+
+displaySelectedSprintsMeet();
+
+}
+
+// After fetching Sprints meet data from Google Sheets
+function populateSprintsMeets(meetRows) {
+    const meetMap = {};
+
+    meetRows.forEach(r => {
+        if (!r.meet) return;
+
+        const dateParts = (r.date || '').split('/');
+        let ts = 0;
+        if (dateParts.length === 3) {
+            let month = parseInt(dateParts[0], 10);
+            let day = parseInt(dateParts[1], 10);
+            let year = parseInt(dateParts[2], 10);
+            if (year < 100) year += 2000;
+            ts = new Date(year, month - 1, day).getTime();
+        }
+
+        if (!meetMap[r.meet] || ts > meetMap[r.meet].ts) {
+            meetMap[r.meet] = { name: r.meet, ts };
+        }
+    });
+
+    const sortedNames = Object.values(meetMap)
+        .sort((a, b) => a.ts - b.ts)
+        .map(o => o.name);
+
+    const selector = document.getElementById("meet-selector");
+    selector.innerHTML = sortedNames
+        .map(name => `<option value="${name}">${name}</option>`)
+        .join('');
+
+    if (sortedNames.length > 0) {
+        selector.value = sortedNames[sortedNames.length - 1]; // select newest meet
+        if (typeof window.displaySelectedMeet === 'function') {
+            window.displaySelectedMeet();
+        }
+    }
+}
+
+function getCurrentMeetData() {
+    const sportTab = document.querySelector('.sport-tab.active').dataset.sport;
+    if (sportTab === 'sprints') return sprintsMeetData;
+    if (sportTab === 'distance') return distanceMeetData; // or whatever your distance array is
+    return [];
+}
+
+
+
+
+// START OF JUMPS CODE
+let allJumpsPRs = [];
+let jumpsMeetData = [];
+let jumpsMeetSortState = { column: null, ascending: true };
+
+// --- JUMPS DATA FETCHING ---
+async function fetchJumpsPRs() {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Jumps_PRs!A2:E?key=${API_KEY}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data.values || data.values.length === 0) {
+            document.getElementById("jumps-pr-container").innerHTML = "<p>No jumps PR data found.</p>";
+            return;
+        }
+
+        // Map the unified columns: Name, LJ, TJ, HJ, PV
+        allJumpsPRs = data.values.map(row => ({
+            name: row[0]?.trim() || "",
+            long: row[1] || "--",
+            triple: row[2] || "--",
+            high: row[3] || "--",
+            pole: row[4] || "--"
+        }));
+
+        renderJumpsPRTable();
+    } catch (error) {
+        console.error("Jumps PR Fetch Error:", error);
+    }
+    const lastUpdated = document.getElementById('last-updated-jumps');
+    if (lastUpdated) {
+        const now = new Date();
+        const options = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
+        lastUpdated.textContent = `Synced with Google Sheets: ${now.toLocaleString('en-US', options)}`;
+    }
+}
+
+function renderJumpsPRTable() {
+    const container = document.getElementById("jumps-pr-container");
+    if (!container) return;
+
+    let html = `
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Long Jump</th>
+                <th>Triple Jump</th>
+                <th>High Jump</th>
+                <th>Pole Vault</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+
+    allJumpsPRs.forEach(athlete => {
+        if (athlete.name) {
+            html += `
+            <tr>
+                <td class="name-cell">${cleanName(athlete.name)}</td>
+                <td>${athlete.long}</td>
+                <td>${athlete.triple}</td>
+                <td>${athlete.high}</td>
+                <td>${athlete.pole}</td>
+            </tr>
+            `;
+        }
+    });
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
+}
+
+async function fetchJumpsMeetResults() {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Jumps_Results!A2:G?key=${API_KEY}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data.values || data.values.length === 0) return;
+
+        jumpsMeetData = data.values.map(row => ({
+            name: row[0],
+            meet: row[1],
+            date: row[2],
+            long: row[3],
+            triple: row[4],
+            high: row[5],
+            pole: row[6]
+        }));
+
+        const meetMap = {};
+        jumpsMeetData.forEach(r => {
+            if (r.meet) {
+                const parts = (r.date || "").split('/');
+                let ts = 0;
+                if (parts.length === 3) {
+                    let [m, d, y] = parts.map(n => parseInt(n));
+                    if (y < 100) y += 2000;
+                    ts = new Date(y, m - 1, d).getTime();
+                }
+                if (!meetMap[r.meet] || ts > meetMap[r.meet].ts) {
+                    meetMap[r.meet] = { name: r.meet, ts };
+                }
+            }
+        });
+
+        const sortedMeets = Object.values(meetMap).sort((a, b) => a.ts - b.ts).map(o => o.name);
+        const selector = document.getElementById("jumps-meet-selector");
+        if (selector) {
+            selector.innerHTML = sortedMeets.map(m => `<option value="${m}">${m}</option>`).join('');
+            if (sortedMeets.length > 0) {
+                selector.value = sortedMeets[sortedMeets.length - 1];
+                window.displaySelectedJumpsMeet();
+            }
+        }
+    } catch (error) {
+        console.error("Jumps Results Fetch Error:", error);
+    }
+}
+
+// --- JUMPS DISPLAY LOGIC ---
+// Helper to calculate the difference in inches and format it
+function calculateJumpsDelta(oldMark, newMark) {
+    const oldInches = parseThrowDistance(oldMark);
+    const newInches = parseThrowDistance(newMark);
+    const diff = newInches - oldInches;
+    
+    if (diff <= 0) return "";
+    
+    const feet = Math.floor(diff / 12);
+    // Use toFixed(2) and then remove trailing zeros to keep it clean (e.g., 0.5 instead of 0.50)
+    let inches = (diff % 12).toFixed(2);
+    inches = parseFloat(inches); 
+    
+    return `+${feet}' ${inches}"`;
+}
+
+window.displaySelectedJumpsMeet = function() {
+    if (!allJumpsPRs || allJumpsPRs.length === 0) {
+        setTimeout(displaySelectedJumpsMeet, 100);
+        return;
+    }
+
+    const selector = document.getElementById("jumps-meet-selector");
+    const container = document.getElementById("jumps-meet-results-container");
+    if (!selector || !container) return;
+
+    const selectedMeet = selector.value;
+    container.innerHTML = "";
+    if (!selectedMeet) return;
+
+    const meetRows = jumpsMeetData.filter(r => r.meet === selectedMeet);
+    let totalAttempts = 0;
+    let totalPRs = 0;
+
+    const headers = ["Athlete", "Long Jump", "Triple Jump", "High Jump", "Pole Vault"];
+    let tableHtml = `<table><thead><tr>`;
+    headers.forEach((h, i) => {
+        tableHtml += `<th class="sortable" onclick="sortJumpsMeet(${i})">${h}</th>`;
+    });
+    tableHtml += `</tr></thead><tbody>`;
+
+    meetRows.forEach(r => {
+        const athletePR = allJumpsPRs.find(p => p.name.toLowerCase().trim() === r.name.toLowerCase().trim()) || {};
+
+        const formatJump = (mark, prMark) => {
+            if (!mark || mark === '--' || mark === '-' || mark.trim() === "") return '--';
+            totalAttempts++;
+            
+            const markVal = parseThrowDistance(mark); 
+            const prVal = parseThrowDistance(prMark);
+
+            if (!prMark || prMark === '--' || prMark === '-') {
+                totalPRs++;
+                return `<span class="pr-highlight">${mark} ⭐<span class="pr-delta">(Debut)</span></span>`;
+            }
+
+            if (markVal > prVal) {
+                totalPRs++;
+                const delta = calculateJumpsDelta(prMark, mark);
+                return `<span class="pr-highlight">${mark} ⭐<span class="pr-delta">(${delta})</span></span>`;
+            }
+            if (markVal === prVal && markVal > 0) {
+                totalPRs++;
+                return `<span class="pr-highlight">${mark} ⭐</span>`;
+            }
+            return mark;
+        };
+
+        tableHtml += `<tr>
+            <td class="name-cell">${cleanName(r.name)}</td>
+            <td>${formatJump(r.long, athletePR.long)}</td>
+            <td>${formatJump(r.triple, athletePR.triple)}</td>
+            <td>${formatJump(r.high, athletePR.high)}</td>
+            <td>${formatJump(r.pole, athletePR.pole)}</td>
+        </tr>`;
+    });
+
+    tableHtml += "</tbody></table>";
+
+    const prPercent = totalAttempts > 0 ? ((totalPRs / totalAttempts) * 100).toFixed(1) : 0;
+    
+    // Updated Summary to match Distance style
+    const summaryHTML = `
+        <div class="meet-summary">
+            <h3>${selectedMeet} – Jumps Results</h3>
+            <p><strong>PR Rate:</strong> ${prPercent}% (${totalPRs} PRs out of ${totalAttempts} Jumps/Vaults)</p>
+        </div>
+    `;
+
+    container.innerHTML = summaryHTML + tableHtml;
+    
+    if (jumpsMeetSortState.column !== null) {
+        updateJumpsHeaderArrows(jumpsMeetSortState.column);
+    }
+};
+
+function sortJumpsMeet(col) {
+    if (jumpsMeetSortState.column === col) {
+        jumpsMeetSortState.ascending = !jumpsMeetSortState.ascending;
+    } else {
+        jumpsMeetSortState.column = col;
+        jumpsMeetSortState.ascending = true;
+    }
+
+    const table = document.querySelector("#jumps-meet-results-container table");
+    if (!table) return;
+
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+
+    rows.sort((a, b) => {
+        const aVal = a.children[col].textContent.trim();
+        const bVal = b.children[col].textContent.trim();
+
+        if (col === 0) {
+            return jumpsMeetSortState.ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        } else {
+            const distA = parseThrowDistance(aVal);
+            const distB = parseThrowDistance(bVal);
+            // FLIPPED: If ascending is true, we want the BIGGEST (Best) at the top
+            return jumpsMeetSortState.ascending ? distB - distA : distA - distB;
+        }
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+    updateJumpsHeaderArrows(col);
+}
+
+function updateJumpsHeaderArrows(activeCol) {
+    const headers = document.querySelectorAll("#jumps-meet-results-container th.sortable");
+    headers.forEach((th, i) => {
+        th.classList.remove('active-asc', 'active-desc');
+        if (i === activeCol) {
+            th.classList.add(jumpsMeetSortState.ascending ? 'active-asc' : 'active-desc');
+        }
+    });
+}
+
+function parseThrowDistance(distStr) {
+    if (!distStr || distStr === '--' || distStr === '-' || distStr === '0') return 0;
+    
+    // 1. Clean up stars, deltas, and labels
+    let cleanStr = distStr.toString()
+        .replace(/⭐|\(PR!\)|\(Debut\)|\+/g, '')
+        .replace(/\(.*?\)/g, '') // Removes anything in parentheses like (+1' 2")
+        .trim();
+    
+    // 2. Regex to find Feet (') and Inches (") including decimals
+    // This looks for: Numbers -> optionally a decimal -> optionally more numbers
+    const feetMatch = cleanStr.match(/(\d+(\.\d+)?)\s*'/);
+    const inchMatch = cleanStr.match(/(\d+(\.\d+)?)\s*"/);
+    
+    let totalInches = 0;
+    
+    if (feetMatch) {
+        totalInches += parseFloat(feetMatch[1]) * 12;
+    }
+    
+    if (inchMatch) {
+        totalInches += parseFloat(inchMatch[1]);
+    }
+    
+    // 3. Fallback: If no symbols found, try to parse as a raw number
+    if (!feetMatch && !inchMatch) {
+        return parseFloat(cleanStr) || 0;
+    }
+    
+    return totalInches;
+}
+
+function resetJumpsMeetSort() {
+    const searchBar = document.getElementById("jumps-meet-search");
+    if (searchBar) searchBar.value = "";
+    jumpsMeetSortState = { column: null, ascending: true };
+    displaySelectedJumpsMeet();
+}
+
+
+/**
+ * AUTO-LOAD TRIGGER
+ * This waits for the data to arrive and then "kicks" the tables into rendering.
+ */
+
+
+window.addEventListener("load", () => {
+    // We wait 1.2 seconds to ensure the Google Sheets API has finished its job
+    setTimeout(() => {
+        console.log("Auto-triggering PR tables...");
+        
+        // Trigger Distance PRs
+        if (typeof resetPRs === "function") {
+            resetPRs();
+        }
+        /*
+        // Trigger Sprints PRs (if that function exists)
+        if (typeof resetSprintsPRs === "function") {
+            resetSprintsPRs();
+        } else if (typeof renderSprintsPRTable === "function" && allSprintsPRs.length > 0) {
+            // Fallback if you don't have a resetSprintsPRs function yet
+            renderSprintsPRTable(allSprintsPRs);
+        }
+            */
+    }, 1000); 
+});
+
+
+// --- Fetch Sprints PRs ---
+async function fetchSprintsPRs() {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sprints_PRs!A2:J?key=${API_KEY}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!data.values) {
+            document.getElementById('sprints-pr-container').innerHTML = "<p>No sprints data found.</p>";
+            return;
+        }
+
+        allSprintsPRs = [];
+
+        data.values.forEach(row => {
+            const name = row[0]?.trim();
+            if (name) {
+                allSprintsPRs.push({
+                    name: name,
+                    m100: row[1] || "",
+                    m200: row[2] || "",
+                    m400: row[3] || "",
+                    m800: row[4] || "",
+                    hurdles110: row[5] || "",
+                    hurdles300: row[6] || "",
+                    relay4x100: row[7] || "",
+                    relay4x400: row[8] || "",
+                    relay4x200: row[9] || ""
+                });
+            }
+        });
+
+        // --- Reset table AFTER allSprintsPRs is ready ---
+        resetSprintsPRs();
+
+    } catch (error) {
+        console.error("Sprint PR Fetch Error:", error);
+    }
+
+    const lastUpdated = document.getElementById('last-updated-sprints');
+    if (lastUpdated) {
+        const now = new Date();
+        const options = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
+        lastUpdated.textContent = `Synced with Google Sheets: ${now.toLocaleString('en-US', options)}`;
+    }
+}
+
+// --- Reset Sprints PR Table ---
+window.resetSprintsPRs = function() {
+    // Clear search input
+    document.getElementById('sprints-pr-search').value = '';
+    
+    // Re-render both to ensure all rows are visible
+    renderSprintsPRTable(allSprintsPRs);
+    renderSprintsRelayTable();
+    
+    console.log("Sprints PRs reset.");
+};
+
+// --- Tab click logic ---
+document.addEventListener("DOMContentLoaded", () => {
+    const sportTabs = document.querySelectorAll(".sport-tab");
+
+    sportTabs.forEach(tab => {
+        tab.addEventListener("click", async () => {
+            const sport = tab.dataset.sport;
+
+            // hide all wrappers first
+            document.querySelectorAll("#distance-wrapper, #sprints-wrapper, #throws-wrapper, #jumps-wrapper")
+                .forEach(w => w.classList.add("hidden-section"));
+
+            // remove active class from all tabs, set current active
+            sportTabs.forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+
+            // show selected sport
+            const wrapper = document.getElementById(`${sport}-wrapper`);
+            if (wrapper) wrapper.classList.remove("hidden-section");
+
+            // --- Only auto-load/reset Sprints PRs when Sprints tab is opened ---
+            if (sport === "sprints" && allSprintsPRs.length === 0) {
+                await fetchSprintsPRs();  // fetch & reset happens inside this function
+                resetSprintsPRs();
+                renderSprintsRelayTable(); // 👈 this line
+            } else if (sport === "sprints") {
+                // Data already exists, just reset
+                resetSprintsPRs();
+            }
+        });
+    });
+
+    // Auto-open default tab on page load (Distance)
+    sportTabs[0].click(); 
+});
+
+document.querySelectorAll(".sub-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+
+        // hide both sections
+        document.getElementById("sprints-individual").classList.add("hidden-section");
+        document.getElementById("sprints-relays").classList.add("hidden-section");
+
+        // remove active state
+        document.querySelectorAll(".sub-tab").forEach(b => b.classList.remove("active"));
+
+        // activate clicked tab
+        btn.classList.add("active");
+
+        // show correct section
+        const tab = btn.dataset.tab;
+        document.getElementById(`sprints-${tab}`).classList.remove("hidden-section");
+    });
+});
+
+function renderSprintsRelayTable() {
+    const container = document.getElementById("sprints-relays-container");
+
+    let html = `
+    <table>
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>4x100</th>
+        <th>4x400</th>
+        <th>4x200</th>
+    </tr>
+    </thead>
+    <tbody>
+    `;
+
+    allSprintsPRs.forEach(row => {
+        if (!row.name) return;
+
+        html += `
+        <tr>
+            <td class="name-cell">${row.name}</td>
+            <td>${row.relay4x100 || '--'}</td>
+            <td>${row.relay4x400 || '--'}</td>
+            <td>${row.relay4x200 || '--'}</td>
+        </tr>
+        `;
+    });
+
+    html += "</tbody></table>";
+
+    container.innerHTML = html;
+}
+
+function formatCell(mark, pr) {
+    if (!mark || mark === '--' || mark.trim() === "") return '--';
+
+    let secondsMark = timeToSeconds(mark);
+    let secondsPR = timeToSeconds(pr);
+
+    // Count performance
+    if (secondsMark > 0) window._totalPerformances = (window._totalPerformances || 0) + 1;
+
+    // Debut PR
+    if (!pr || pr === '--') {
+        window._totalPRs = (window._totalPRs || 0) + 1;
+        return `<span class="pr-highlight">${mark} ⭐<span class="pr-delta">(Debut)</span></span>`;
+    }
+
+    // New PR (LOWER time is better)
+    if (secondsMark < secondsPR) {
+        window._totalPRs = (window._totalPRs || 0) + 1;
+        const delta = (secondsPR - secondsMark).toFixed(2);
+        return `<span class="pr-highlight">${mark} ⭐<span class="pr-delta">(-${delta}s)</span></span>`;
+    }
+
+    // Equal PR
+    if (secondsMark === secondsPR) {
+        window._totalPRs = (window._totalPRs || 0) + 1;
+        return `<span class="pr-highlight">${mark} ⭐</span>`;
+    }
+
+    return mark;
+}
+
+function switchSprintsMeetTab(tab) {
+    document.getElementById("sprints-individual").classList.add("hidden-section");
+    document.getElementById("sprints-relays").classList.add("hidden-section");
+
+    document.querySelectorAll("#sprints-meet-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+
+    document.querySelector(`#sprints-meet-tabs .tab-btn[data-tab='${tab}']`).classList.add("active");
+
+    document.getElementById(`sprints-${tab}`).classList.remove("hidden-section");
+}
+
+window.switchSprintsPRTab = function(tab) {
+    // 1. Update Button Visuals
+    const prTabButtons = document.querySelectorAll('#sprints-pr-tabs .tab-btn');
+    prTabButtons.forEach(btn => {
+        // Simple check: does the button text contain "Indiv" or "Relay"?
+        const isMatch = btn.textContent.toLowerCase().includes(tab.substring(0, 3));
+        btn.classList.toggle('active', isMatch);
+    });
+
+    // 2. Toggle the wrappers defined in your HTML
+    const individualWrapper = document.getElementById("sprints-individual");
+    const relayWrapper = document.getElementById("sprints-relays");
+
+    if (tab === 'individual') {
+        individualWrapper.classList.remove("hidden-section");
+        relayWrapper.classList.add("hidden-section");
+        renderSprintsPRTable(allSprintsPRs); // Refresh Indiv
+    } else {
+        individualWrapper.classList.add("hidden-section");
+        relayWrapper.classList.remove("hidden-section");
+        renderSprintsRelayTable(); // Refresh Relays
+    }
+};

@@ -10,179 +10,236 @@
 <body>
     <div class="sport-tabs">
         <button class="sport-tab active" data-sport="distance">Long Distance</button>
+        <button class="sport-tab" data-sport="sprints">Sprinters</button>
+        <button class="sport-tab" data-sport="jumps">Jumpers</button>
         <button class="sport-tab" data-sport="throws">Throws</button>
     </div>
 
-    
     <div id="distance-wrapper">
-    <header>
-        <h1>Team Performance Dashboard</h1>
-        <p>Tracking mileage and personal records for <strong>Long Distance Track Season</strong></p>
-        <p id="last-updated" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
-    </header>
+        <header>
+            <h1>Team Performance Dashboard</h1>
+            <p>Tracking mileage and personal records for <strong>Long Distance Track Season</strong></p>
+            <p id="last-updated" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
+        </header>
 
-    <div class="view-controls">
-        <button class="view-btn active" data-section="all">Dashboard View</button>
-        <button class="view-btn active" data-section="mileage">Weekly Mileage</button>
-        <button class="view-btn active" data-section="season">Season Insights</button>
-        <button class="view-btn active" data-section="pr">PRs</button>
-        <button class="view-btn active" data-section="results">Meet Results</button>
-    </div>
-    
-    <main>
-        <section id="mileage-section">
-            <h2>Weekly Mileage</h2>
-
-            <div class="controls">
-                <label for="week-selector">View Week:</label>
-                <select id="week-selector"></select>
-    
-                <button onclick="sortMileage()" class="sort-btn">Sort by Highest Mileage</button>
-                <button onclick="resetSort()" class="reset-btn">Reset Order</button>
-            </div>
-
-            <div id="mileage-container">
-                <p>Loading mileage data...</p>
-            </div>
-        </section>
-
-        <section id="season-insights-section" style="flex: 1 1 100%;">
-            <h2>Season Insights</h2>
-            <div class="insights-grid">
-                <div class="insight-card">
-                    <h3>Total Team Miles</h3>
-                    <p id="total-team-miles">0</p>
+        <div class="view-controls">
+            <button class="view-btn active" data-section="all">Dashboard View</button>
+            <button class="view-btn active" data-section="mileage">Weekly Mileage</button>
+            <button class="view-btn active" data-section="season">Season Insights</button>
+            <button class="view-btn active" data-section="pr">PRs</button>
+            <button class="view-btn active" data-section="results">Meet Results</button>
+        </div>
+        
+        <main>
+            <section id="mileage-section">
+                <h2>Weekly Mileage</h2>
+                <div class="controls">
+                    <label for="week-selector">View Week:</label>
+                    <select id="week-selector"></select>
+                    <button onclick="sortMileage()" class="sort-btn">Sort by Highest Mileage</button>
+                    <button onclick="resetSort()" class="reset-btn">Reset Order</button>
                 </div>
-                <div class="insight-card">
-                    <h3>Attendance Health</h3>
-                    <p id="attendance-stat">0%</p>
+                <div id="mileage-container">
+                    <p>Loading mileage data...</p>
                 </div>
-            
-                <div class="insight-card group-leaders-wide">
-                    <h3>Group Leaders</h3>
-                    <div class="gender-split-container">
-                        <div id="girls-leaders-column">
-                            </div>
-                        <div id="boys-leaders-column">
-                            </div>
+            </section>
+
+            <section id="season-insights-section" style="flex: 1 1 100%;">
+                <h2>Season Insights</h2>
+                <div class="insights-grid">
+                    <div class="insight-card">
+                        <h3>Total Team Miles</h3>
+                        <p id="total-team-miles">0</p>
+                    </div>
+                    <div class="insight-card">
+                        <h3>Attendance Health</h3>
+                        <p id="attendance-stat">0%</p>
+                    </div>
+                    <div class="insight-card group-leaders-wide">
+                        <h3>Group Leaders</h3>
+                        <div class="gender-split-container">
+                            <div id="girls-leaders-column"></div>
+                            <div id="boys-leaders-column"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div id="season-leaderboard-container">
+                <div id="season-leaderboard-container"></div>
+            </section>
+
+            <section id="pr-section">
+                <h2>Personal Records</h2>
+                <h5>(Based strictly on Track Season times)</h5>
+                <div class="controls">
+                    <input type="text" id="pr-search" placeholder="Search athlete..." onkeyup="filterPRs()">
+                    <button onclick="resetPRs()" class="reset-btn">Reset Order</button>
                 </div>
-        </section>
-
-        <section id="pr-section">
-            <h2>Personal Records</h2>
-            <h5>(Based strictly on Track Season times)</h5>
-            <div class="controls">
-                <input type="text" id="pr-search" placeholder="Search athlete..." onkeyup="filterPRs()">
-                <button onclick="resetPRs()" class="reset-btn">Reset Order</button>
-            </div>
-
-            <div id="pr-container">
-                <p>Loading PRs...</p>
-            </div>
-        </section>
-
-        <section id="results-section">
-            <h2>Meet Results</h2>
-            <div class="controls meet-controls">
-                <label for="meet-selector">Select Meet</label>
-                <div class="custom-select-wrapper">
-                    <select id="meet-selector" onchange="displaySelectedMeet()">
-                        <option value="">Loading meets...</option>
-                    </select>
-                    <span class="select-arrow">▾</span>
+                <div id="pr-container">
+                    <p>Loading PRs...</p>
                 </div>
-            
-                <!-- New: tabs -->
-                <div class="meet-tabs" id="meet-tabs" style="display: none; margin-top: 12px;">
-                    <button class="tab-btn active" data-tab="individual" onclick="switchMeetTab('individual')">Individual Events</button>
-                    <button class="tab-btn" data-tab="relay" onclick="switchMeetTab('relay')">Relay Events</button>
-                </div>
+            </section>
 
-                <div class="meet-results-controls" id="meet-results-controls" style="display: none; margin: 15px 0 20px; text-align: center;">
-                    <input type="text" id="meet-search" placeholder="Search athlete..." onkeyup="filterMeetResults()">
-                    <button class="reset-btn small-reset" onclick="resetMeetSort()" style="margin-top: 8px; font-size: 0.9rem;">Reset Sort & Search</button>
-                </div>
+            <section id="results-section">
+                <h2>Meet Results</h2>
+                <div class="controls meet-controls">
+                    <label for="distance-meet-selector">Select Meet</label>
+                    <div class="custom-select-wrapper">
+                        <select id="distance-meet-selector" onchange="displaySelectedMeet()">
+                            <option value="">Loading meets...</option>
+                        </select>
+                        <span class="select-arrow">▾</span>
+                    </div>
+                
+                    <div class="meet-tabs" id="meet-tabs" style="display: none; margin-top: 12px;">
+                        <button class="tab-btn active" data-tab="individual" onclick="switchMeetTab('individual')">Individual Events</button>
+                        <button class="tab-btn" data-tab="relay" onclick="switchMeetTab('relay')">Relay Events</button>
+                    </div>
 
-            </div>
-            
-            <div id="meet-results-container"></div>
-        </section>
-        
-    </main>
+                    <div class="meet-results-controls" id="meet-results-controls" style="display: none;">
+                        <input type="text" id="distance-meet-search" placeholder="Search athlete..." onkeyup="filterMeetResults()">
+                        <button class="reset-btn small-reset" onclick="resetMeetSort()">Reset Sort & Search</button>
+                    </div>
+                </div>
+                <div id="meet-results-container"></div>
+            </section>
+        </main>
     </div>
 
     <div id="throws-wrapper" class="hidden-section">
-
         <header>
             <h1>Team Performance Dashboard</h1>
-            <p>Tracking mileage and personal records for <strong>Throws Track Season</strong></p>
+            <p>Tracking personal records and meet results for <strong>Throws Track Season</strong></p>
             <p id="last-updated2" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
         </header>
-
-    <div class="throws-grid">
-
-        <!-- LEFT COLUMN -->
-        <section id="throws-pr-section">
-            <h2>Throws Personal Records</h2>
-            <div id="throws-pr-container">
-                <p>Loading Throws PRs...</p>
-            </div>
-        </section>
-
-        <!-- RIGHT COLUMN -->
-    <section id="throws-results-section">
-        <h2>Throws Meet Results</h2>
-
-        <div class="controls throws-meet-controls">
-
-            <!-- Meet Selector -->
-            <label for="throws-meet-selector">Select Meet</label>
-            <div class="throws-custom-select-wrapper">
-                <select id="throws-meet-selector" onchange="displaySelectedThrowsMeet()">
-                    <option value="">Loading meets...</option>
-                </select>
-                <span class="throws-select-arrow">▾</span>
-            </div>
-
-            <!-- Athlete Search + Reset -->
-            <div id="throws-meet-results-controls" class="meet-results-controls" style="display: none;">
-                <input type="text" id="throws-meet-search" placeholder="Search athlete..." onkeyup="filterThrowsMeetResults()">
-                <button class="reset-btn small-reset" onclick="resetThrowsMeetSort()">Reset Sort & Search</button>
-            </div>
-
+        <div class="throws-grid">
+            <section id="throws-pr-section">
+                <h2>Throws Personal Records</h2>
+                <div id="throws-pr-container">
+                    <p>Loading Throws PRs...</p>
+                </div>
+            </section>
+            <section id="throws-results-section">
+                <h2>Throws Meet Results</h2>
+                <div class="controls throws-meet-controls">
+                    <label for="throws-meet-selector">Select Meet</label>
+                    <div class="throws-custom-select-wrapper">
+                        <select id="throws-meet-selector" onchange="displaySelectedThrowsMeet()">
+                            <option value="">Loading meets...</option>
+                        </select>
+                        <span class="throws-select-arrow">▾</span>
+                    </div>
+                    <div id="throws-meet-results-controls" class="meet-results-controls" style="display: none;">
+                        <input type="text" id="throws-meet-search" placeholder="Search athlete..." onkeyup="filterThrowsMeetResults()">
+                        <button class="reset-btn small-reset" onclick="resetThrowsMeetSort()">Reset Sort & Search</button>
+                    </div>
+                </div>
+                <div id="throws-meet-summary" class="meet-summary hidden-section"></div>
+                <div id="throws-meet-results-container"></div>
+            </section>
         </div>
+    </div>
 
-        <!-- Summary and Results Table -->
-        <div id="throws-meet-summary" class="meet-summary hidden-section"></div>
-        <div id="throws-meet-results-container"></div>
-    </section>
+    <div id="sprints-wrapper" class="hidden-section">
+        <header>
+            <h1>Team Performance Dashboard</h1>
+            <p>Tracking personal records and meet results for <strong>Sprints Track Season</strong></p>
+            <p id="last-updated-sprints" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
+        </header>
+        <div class="throws-grid">
+            <section id="sprints-pr-section">
+                <h2>Sprints Personal Records</h2>
+                
+                <div id="sprints-pr-tabs" class="meet-tabs" style="margin-bottom: 15px;">
+                    <button class="tab-btn active" onclick="switchSprintsPRTab('individual')">Individual PRs</button>
+                    <button class="tab-btn" onclick="switchSprintsPRTab('relays')">Relay PRs</button>
+                </div>
+                <br>
 
+                <div class="controls">
+                    <input type="text" id="sprints-pr-search" placeholder="Search athlete..." onkeyup="filterSprintsPRs()">
+                    <button onclick="resetSprintsPRs()" class="reset-btn">Reset Order</button>
+                </div>
+
+                <div id="sprints-individual">
+                    <div id="sprints-pr-container"></div>
+                </div>
+
+                <div id="sprints-relays" class="hidden-section">
+                    <div id="sprints-relays-container"></div>
+                </div>
+            </section>
+            <section id="sprints-results-section">
+                <h2>Sprints Meet Results</h2>
+                <div class="controls meet-controls">
+                    <label for="sprints-meet-selector">Select Meet</label>
+                    <div class="custom-select-wrapper">
+                        <select id="sprints-meet-selector" onchange="displaySelectedSprintsMeet()">
+                            <option value="">Loading meets...</option>
+                        </select>
+                        <span class="select-arrow">▾</span>
+                    </div>
+                
+                    <div id="sprints-meet-tabs" class="meet-tabs" style="margin-bottom: 15px;">
+                        <button class="tab-btn active" onclick="switchSprintsMeetTab('individual')">Individual Events</button>
+                        <button class="tab-btn" onclick="switchSprintsMeetTab('relays')">Relay Events</button>
+                    </div>
+
+                    <div class="meet-results-controls" id="sprints-meet-results-controls" style="display: none; margin: 15px 0 20px; text-align: center;">
+                        <input type="text" id="sprints-meet-search" placeholder="Search athlete..." onkeyup="filterSprintsMeetResults()">
+                        <button class="reset-btn small-reset" onclick="resetSprintsMeetSort()">Reset Sort & Search</button>
+                    </div>
+                </div>
+                <!--<div id="sprints-meet-summary" class="meet-summary hidden-section"></div>-->
+                <div id="sprints-meet-results-container"></div>
+            </section>
         </div>
+    </div>
 
+    <div id="jumps-wrapper" class="hidden-section">
+        <header>
+            <h1>Team Performance Dashboard</h1>
+            <p>Tracking personal records and meet results for <strong>Jumps Track Season</strong></p>
+            <p id="last-updated-jumps" style="font-size: 0.8rem; opacity: 0.8; font-style: italic;">Loading status...</p>
+        </header>
+        <div class="throws-grid">
+            <section id="jumps-pr-section">
+                <h2>Jumps Personal Records</h2>
+                <div id="jumps-pr-container">
+                    <p>Loading Jumps PRs...</p>
+                </div>
+            </section>
+            <section id="jumps-results-section">
+                <h2>Jumps Meet Results</h2>
+                <div class="controls throws-meet-controls">
+                    <label for="jumps-meet-selector">Select Meet</label>
+                    <div class="throws-custom-select-wrapper">
+                        <select id="jumps-meet-selector" onchange="displaySelectedJumpsMeet()">
+                            <option value="">Loading meets...</option>
+                        </select>
+                        <span class="throws-select-arrow">▾</span>
+                    </div>
+                    <div id="jumps-meet-results-controls" class="meet-results-controls" style="display:none;">
+                        <input type="text" id="jumps-meet-search" placeholder="Search athlete..." onkeyup="filterJumpsMeetResults()">
+                        <button class="reset-btn small-reset" onclick="resetJumpsMeetSort()">Reset Sort & Search</button>
+                    </div>
+                </div>
+                <div id="jumps-meet-summary" class="meet-summary hidden-section"></div>
+                <div id="jumps-meet-results-container"></div>
+            </section>
+        </div>
     </div>
     
     <div id="chart-overlay" onclick="closeChart()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:999;"></div>
 
-        <div id="chart-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:30px 20px 20px 20px; border-radius:12px; z-index:1000; width:90%; max-width:600px; max-height: 90vh; overflow-y: auto; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    
-            <button onclick="closeChart()" style="position: absolute; top: 15px; right: 15px; cursor:pointer; background:chocolate; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; z-index: 1001;">X</button>
-            
-            <h3 id="chart-title" style="color:chocolate; margin:0 0 15px 0; font-size: 1.4rem; text-align: center; width: 100%; display: block;">
-                Athlete Name
-            </h3>
-        
-            <div id="chart-content-wrapper" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
-                <div id="chart-container-inner" style="position: relative; height: 50vh; min-height: 250px; width: 100%;">
-                    <canvas id="progressionChart"></canvas>
-                </div>
+    <div id="chart-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:30px 20px 20px 20px; border-radius:12px; z-index:1000; width:90%; max-width:600px; max-height: 90vh; overflow-y: auto; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <button onclick="closeChart()" style="position: absolute; top: 15px; right: 15px; cursor:pointer; background:chocolate; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; z-index: 1001;">X</button>
+        <h3 id="chart-title" style="color:chocolate; margin:0 0 15px 0; font-size: 1.4rem; text-align: center; width: 100%; display: block;">Athlete Name</h3>
+        <div id="chart-content-wrapper" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+            <div id="chart-container-inner" style="position: relative; height: 50vh; min-height: 250px; width: 100%;">
+                <canvas id="progressionChart"></canvas>
             </div>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>

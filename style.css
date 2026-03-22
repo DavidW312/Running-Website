@@ -602,12 +602,14 @@ thead th {
     padding-left: 12px !important;
 }
 
+/*
 .meet-results-controls {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
 }
+*/
 
 #meet-search {
     width: 280px;
@@ -874,4 +876,171 @@ th.sortable.active-desc::after {
     outline: none;
     border-color: chocolate;
     box-shadow: 0 0 0 3px rgba(210,105,30,0.15);
+}
+
+/* Ensure Sprinter containers match Distance heights */
+#sprints-pr-container { max-height: 850px; overflow-y: auto; border-radius: 8px; border: 1px solid #eee; }
+#sprints-meet-results-container { max-height: 725px; overflow-y: auto; border-radius: 8px; border: 1px solid #eee; }
+
+/* Specifically target the Sprinter search to look like the Distance search */
+#sprints-meet-search, #sprints-pr-search {
+    width: 280px;
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 0.95rem;
+    border: 2px solid #e6c2a6;
+    border-radius: 30px;
+    background: #fffaf5;
+    color: #8b4513;
+    outline: none;
+}
+
+.hidden-section { display: none !important; }
+
+/* UPDATED: Works for distance, sprints, throws, and jumps selectors */
+.custom-select-wrapper, 
+.throws-custom-select-wrapper {
+    position: relative;
+    width: 260px;
+    margin: 0 auto;
+}
+
+/* Updated to target all meet selectors by ID */
+#distance-meet-selector,
+#meet-selector,
+#sprints-meet-selector,
+#throws-meet-selector,
+#jumps-meet-selector {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 100%;
+    padding: 12px 40px 12px 15px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 30px;
+    border: 2px solid #e6c2a6;
+    background-color: #fffaf5;
+    color: #8b4513;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#distance-meet-selector:hover,
+#sprints-meet-selector:hover,
+#throws-meet-selector:hover,
+#jumps-meet-selector:hover {
+    background-color: #f8eee8;
+    border-color: chocolate;
+}
+
+/* Shared arrow style */
+.select-arrow, 
+.throws-select-arrow {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 1rem;
+    color: chocolate;
+}
+
+/* UPDATED: Standardizes search bars for all sports */
+#distance-meet-search,
+#meet-search,
+#sprints-meet-search,
+#sprints-pr-search,
+#throws-meet-search,
+#jumps-meet-search,
+#pr-search {
+    width: 280px;
+    max-width: 100%;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    border: 2px solid #e6c2a6;
+    border-radius: 30px;
+    background: #fffaf5;
+    color: #8b4513;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+#distance-meet-search:focus,
+#sprints-meet-search:focus,
+#throws-meet-search:focus,
+#jumps-meet-search:focus {
+    border-color: chocolate;
+    box-shadow: 0 0 0 3px rgba(210,105,30,0.15);
+}
+
+/* UPDATED: Namespaced Tab logic */
+#meet-tabs, 
+#sprints-meet-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 12px 0 18px;
+}
+
+.tab-btn {
+    padding: 10px 24px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 30px;
+    border: none;
+    cursor: pointer;
+    background: #f4e7df;
+    color: #8b4513;
+    transition: all 0.25s ease;
+}
+
+.tab-btn.active {
+    background: #d2691e;
+    color: white;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+/* UPDATED: Scroll windows for all result tables */
+#meet-results-container,
+#sprints-meet-results-container,
+#throws-meet-results-container,
+#jumps-meet-results-container {
+    width: 100%;
+    max-height: 725px;
+    min-height: 400px;
+    overflow: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    margin-top: 15px;
+    background: white;
+}
+
+/* This forces the search and reset button to stack vertically */
+.meet-results-controls {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+/* Ensure the search bar takes up proper width in the column */
+#distance-meet-search, #sprints-meet-search {
+    width: 280px;
+    margin-bottom: 0; /* Let the gap handle spacing */
+}
+
+#sprints-meet-results-container .meet-summary {
+    margin: 0 0 15px 0; /* Adds space between the bubble and the table */
+    border-left: 5px solid chocolate;
+}
+
+/* Stacks Jumps search and reset button */
+#jumps-meet-results-controls {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 10px;
+    margin-bottom: 20px;
 }
